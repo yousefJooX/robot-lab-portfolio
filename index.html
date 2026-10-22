@@ -54,6 +54,12 @@ h1, h2, h3, h4, p { margin: 0; }
 .key { font: 500 .7rem var(--mono); padding: 4px 8px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; background: var(--surface); }
 @media (max-width: 700px) { #minimap { width: 110px; height: 110px; } .hud-bl .k-desk { display: none; } }
 
+.k-touch { display: none; }
+.touch { position: fixed; z-index: 6; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); display: none; gap: 10px; }
+.touch button { width: 58px; height: 58px; border-radius: 50%; border: 1px solid var(--line); background: rgba(18,21,28,.85); backdrop-filter: blur(8px); font-size: 1.4rem; cursor: pointer; }
+.touch button:active, .touch button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (hover: none), (pointer: coarse) { .touch { display: flex; } .k-touch { display: inline; } }
+.hud-toast { position: fixed; z-index: 6; left: 50%; top: calc(70px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 600 .85rem var(--body); white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
 /* floating labels */
 .labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
 .zl { position: absolute; transform: translate(-50%, -100%); text-align: center; white-space: nowrap; }
@@ -63,7 +69,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .pl.hot { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 /* prompt */
-.prompt { position: fixed; z-index: 6; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 10px 12px 10px 16px; border-radius: 999px; background: rgba(18,21,28,.92); border: 1px solid var(--accent); max-width: calc(100% - 32px); }
+.prompt { position: fixed; z-index: 6; left: 50%; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 10px 12px 10px 16px; border-radius: 999px; background: rgba(18,21,28,.92); border: 1px solid var(--accent); max-width: calc(100% - 32px); }
 .prompt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-weight: 600; }
 
 /* zone panel */
@@ -146,10 +152,20 @@ h1, h2, h3, h4, p { margin: 0; }
   <a class="tbtn primary" href="https://drive.google.com/file/d/1aHct2497Do81mfvoXvjnYqR-Wv7NZp4c/view" target="_blank" rel="noopener">CV ↗</a>
 </div>
 <div class="hud-bl" aria-hidden="true">
-  <span class="key k-desk">W</span><span class="key k-desk">A</span><span class="key k-desk">S</span><span class="key k-desk">D</span><span class="mono k-desk">drive</span>
+  <span class="key k-desk">WASD</span><span class="mono k-desk">move</span>
+  <span class="key k-desk">Shift</span><span class="mono k-desk">sprint</span>
+  <span class="key k-desk">Space</span><span class="mono k-desk">jump + flip</span>
+  <span class="key k-desk">Tab</span><span class="mono k-desk">run to next project</span>
+  <span class="key k-desk">1–7</span><span class="mono k-desk">zones</span>
   <span class="key k-desk">E</span><span class="mono k-desk">open</span>
-  <span class="mono">or tap the floor</span>
+  <span class="mono k-touch">tap the floor to walk</span>
 </div>
+<div class="touch" aria-label="Robot controls">
+  <button type="button" id="t-next" aria-label="Run to next project">⏭</button>
+  <button type="button" id="t-run" aria-label="Toggle sprint">⚡</button>
+  <button type="button" id="t-jump" aria-label="Jump and flip">⤴</button>
+</div>
+<div class="hud-toast" id="hud-toast" hidden></div>
 
 <div class="prompt" id="prompt" hidden><span id="prompt-t"></span><button class="tbtn primary" type="button" id="prompt-b">Open · E</button></div>
 <aside class="panel" id="panel" aria-live="polite"></aside>
@@ -158,10 +174,10 @@ h1, h2, h3, h4, p { margin: 0; }
   <div class="intro-card">
     <span class="mono">IoT &amp; AI Developer · Robotics &amp; AI · Cairo</span>
     <h1 class="disp">Yousef <span>Robot Lab</span></h1>
-    <p>Drive the robot around the lab. Each zone is a field I work in, and every pillar is a project you can open to see how it works.</p>
-    <div class="keys"><span class="key">W A S D</span><span class="key">↑ ← ↓ →</span><span class="key">E open</span><span class="key">tap floor to drive</span></div>
+    <p>Walk, sprint and flip your way around the lab. Each zone is a field I work in, and every pillar is a project you can open to see how it works.</p>
+    <div class="keys"><span class="key">WASD move</span><span class="key">Shift sprint</span><span class="key">Space jump + flip</span><span class="key">Tab next project</span><span class="key">E open</span></div>
     <div class="row-btns" style="justify-content:center">
-      <button class="btn primary" type="button" id="start">Start driving →</button>
+      <button class="btn primary" type="button" id="start">Start →</button>
       <button class="btn" type="button" id="skip">Just show me the projects</button>
       <a class="btn" href="https://drive.google.com/file/d/1aHct2497Do81mfvoXvjnYqR-Wv7NZp4c/view" target="_blank" rel="noopener">View my CV ↗</a>
     </div>
@@ -307,33 +323,77 @@ h1, h2, h3, h4, p { margin: 0; }
     });
   });
 
-  /* robot */
-  const robot = new THREE.Group(); scene.add(robot);
-  const shell = new THREE.MeshStandardMaterial({ color: FG, roughness: .45, metalness: .1 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x1b1f28, roughness: .8 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, .7, 1.5), shell); body.position.y = .75; body.castShadow = true; robot.add(body);
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.32, .12, 1.52), new THREE.MeshBasicMaterial({ color: ACC })); stripe.position.y = .62; robot.add(stripe);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(.95, .55, .85), shell); head.position.set(0, 1.4, .1); head.castShadow = true; robot.add(head);
-  const visor = new THREE.Mesh(new THREE.PlaneGeometry(.75, .25), new THREE.MeshBasicMaterial({ color: COOL })); visor.position.set(0, 1.43, .53); robot.add(visor);
-  const ant = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .5, 6), dark); ant.position.set(.3, 1.9, -.1); robot.add(ant);
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.09, 12, 12), new THREE.MeshBasicMaterial({ color: ACC })); bulb.position.set(.3, 2.17, -.1); robot.add(bulb);
-  const wheels = [];
-  [[-.72, .6], [.72, .6], [-.72, -.6], [.72, -.6]].forEach(([x, z]) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .26, 18), dark); w.rotation.z = Math.PI / 2; w.position.set(x, .36, z); w.castShadow = true; robot.add(w); wheels.push(w); });
+  /* robot: a small two-legged droid */
+  const robot = new THREE.Group(); scene.add(robot);          // position + heading
+  const rig = new THREE.Group(); rig.position.y = 1.05; robot.add(rig); // pivot at centre of mass (flips, lean, squash)
+  const shell = new THREE.MeshStandardMaterial({ color: FG, roughness: .4, metalness: .1 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1b1f28, roughness: .7 });
+  const accM = new THREE.MeshBasicMaterial({ color: ACC }), eyeM = new THREE.MeshBasicMaterial({ color: COOL });
+  const part = (geo, mat, x, y, z, parent = rig) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
+  const torso = part(new THREE.BoxGeometry(.8, .62, .7), shell, 0, .25, 0);
+  part(new THREE.BoxGeometry(.82, .1, .72), accM, 0, .02, 0);
+  part(new THREE.CylinderGeometry(.12, .14, .22, 12), dark, 0, .64, 0);
+  const headG = new THREE.Group(); headG.position.set(0, .95, .02); rig.add(headG);
+  part(new THREE.BoxGeometry(1.15, .58, .78), shell, 0, 0, 0, headG);
+  part(new THREE.BoxGeometry(.96, .38, .05), dark, 0, -.02, .39, headG);
+  const eyes = [-.22, .22].map(x => part(new THREE.CircleGeometry(.09, 20), eyeM, x, .0, .42, headG));
+  [-.36, .36].forEach(x => { part(new THREE.CylinderGeometry(.02, .02, .32, 6), dark, x, .44, -.15, headG); });
+  const bulbs = [-.36, .36].map(x => part(new THREE.SphereGeometry(.06, 10, 10), accM, x, .62, -.15, headG));
+  const legs = [-.24, .24].map(x => {
+    const hip = new THREE.Group(); hip.position.set(x, -.05, 0); rig.add(hip);
+    part(new THREE.CylinderGeometry(.09, .08, .45, 10), dark, 0, -.22, 0, hip);
+    const knee = new THREE.Group(); knee.position.y = -.45; hip.add(knee);
+    part(new THREE.CylinderGeometry(.08, .07, .45, 10), shell, 0, -.22, 0, knee);
+    part(new THREE.BoxGeometry(.26, .09, .4), dark, 0, -.48, .07, knee);
+    return { hip, knee };
+  });
+  const arms = [-.5, .5].map(x => { const sh = new THREE.Group(); sh.position.set(x, .45, 0); rig.add(sh); part(new THREE.CylinderGeometry(.07, .06, .42, 8), shell, 0, -.2, 0, sh); part(new THREE.SphereGeometry(.08, 10, 10), accM, 0, -.44, 0, sh); return sh; });
   const lidar = new THREE.Mesh(new THREE.RingGeometry(.9, 1, 64), new THREE.MeshBasicMaterial({ color: COOL, transparent: true, opacity: .6, side: THREE.DoubleSide }));
   lidar.rotation.x = -Math.PI / 2; lidar.position.y = .04; scene.add(lidar);
   const marker = new THREE.Mesh(new THREE.RingGeometry(.35, .5, 32), new THREE.MeshBasicMaterial({ color: ACC, transparent: true, opacity: .9 }));
   marker.rotation.x = -Math.PI / 2; marker.position.y = .05; marker.visible = false; scene.add(marker);
+  // dust puffs
+  const dust = Array.from({ length: 40 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0x8c919b, transparent: true, opacity: 0 })); m.visible = false; scene.add(m); return { m, life: 0, vx: 0, vy: 0, vz: 0 }; });
+  let dustI = 0;
+  function puff(x, z, n = 1, spread = .6) { for (let i = 0; i < n; i++) { const d = dust[dustI++ % dust.length]; d.m.position.set(x + (Math.random() - .5) * spread, .1, z + (Math.random() - .5) * spread); d.vx = (Math.random() - .5) * 1.5; d.vz = (Math.random() - .5) * 1.5; d.vy = .6 + Math.random(); d.life = 1; d.m.visible = true; } }
 
-  const st = { x: 0, z: 2.2, h: Math.PI, v: 0 }; // heading π = facing -z (north)
-  const keys = new Set(); let target = null;
+  const st = { x: 0, z: 2.2, h: Math.PI, v: 0, y: 0, vy: 0, air: false, flip: 0, flipDir: -1, phase: 0, land: 0 }; // heading π = facing -z (north)
+  const GRAV = 26;
+  const keys = new Set(); let target = null, auto = false, sprintLatch = false, nextIdx = -1;
+  function jump() {
+    if (st.air || reduce) return;
+    st.vy = 9.5; st.air = true; st.flip = 0;
+    st.flipDir = Math.abs(st.v) > 4 ? 1 : -1;   // running: front flip, standing: backflip
+    puff(st.x, st.z, 6);
+  }
+  function goTo(x, z, isAuto = true) { target = { x, z }; auto = isAuto; marker.position.x = x; marker.position.z = z; marker.visible = true; }
+  function goNextProject() {
+    const order = PROJECTS.map(p => pillars.find(m => m.userData.p.id === p.id)).filter(Boolean);
+    nextIdx = (nextIdx + 1) % order.length;
+    const m = order[nextIdx], dx = st.x - m.position.x, dz = st.z - m.position.z, d = Math.hypot(dx, dz) || 1;
+    goTo(m.position.x + dx / d * 1.9, m.position.z + dz / d * 1.9);
+    toastHUD(`→ ${m.userData.p.title}`);
+  }
+  function goZone(i) { const z = ZONES[i]; if (z) { goTo(z.x, z.z + (z.cat ? 0 : 1.5)); toastHUD(`→ ${z.name}`); } }
   addEventListener('keydown', e => {
     if (!modal.hidden || e.target.closest('input, textarea')) return;
     const k = e.key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); target = null; e.preventDefault(); if (document.getElementById('intro')) begin(); }
+    if (document.getElementById('intro') && (k.length === 1 || k.startsWith('arrow') || k === 'tab')) begin();
+    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); target = null; marker.visible = false; e.preventDefault(); }
+    if (k === 'shift') keys.add('shift');
+    if (k === ' ') { e.preventDefault(); jump(); }
+    if (k === 'tab') { e.preventDefault(); goNextProject(); }
+    if (/^[1-7]$/.test(k)) goZone(+k - 1);
     if (k === 'e' && near) openProject(near.userData.p.id);
   });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
   addEventListener('blur', () => keys.clear());
+  // touch controls
+  $('#t-jump').addEventListener('click', jump);
+  $('#t-run').addEventListener('click', e => { sprintLatch = !sprintLatch; e.currentTarget.classList.toggle('on', sprintLatch); });
+  $('#t-next').addEventListener('click', goNextProject);
+  const hudToast = $('#hud-toast'); let hudT = 0;
+  function toastHUD(msg) { hudToast.textContent = msg; hudToast.hidden = false; clearTimeout(hudT); hudT = setTimeout(() => hudToast.hidden = true, 1800); }
 
   /* picking */
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -381,23 +441,50 @@ h1, h2, h3, h4, p { margin: 0; }
       if (keys.has('s') || keys.has('arrowdown')) thr -= .6;
       if (keys.has('a') || keys.has('arrowleft')) turn += 1;
       if (keys.has('d') || keys.has('arrowright')) turn -= 1;
-      if (target && !keys.size) {
+      if (target && !(keys.size - (keys.has('shift') ? 1 : 0))) {
         const dx = target.x - st.x, dz = target.z - st.z, dist = Math.hypot(dx, dz);
         const diff = wrap(Math.atan2(dx, dz) - st.h);
-        turn = Math.max(-1, Math.min(1, diff * 3));
+        turn = Math.max(-1, Math.min(1, diff * 3.5));
         thr = dist > .5 ? (Math.abs(diff) < 1.1 ? Math.min(1, dist / 2 + .3) : .15) : 0;
-        if (dist <= .5) { target = null; marker.visible = false; }
+        if (dist <= .5) { target = null; marker.visible = false; auto = false; if (near) { const dxp = near.position.x - st.x, dzp = near.position.z - st.z; st.h = Math.atan2(dxp, dzp); } }
       }
-      st.h += turn * dt * 2.8 * (thr < 0 ? -1 : 1);
-      st.v += (thr * 9 - st.v) * Math.min(1, dt * 4);
+      const sprint = keys.has('shift') || sprintLatch || auto;
+      const top = sprint ? 17 : 8.5;
+      st.h += turn * dt * (sprint ? 3.4 : 2.8) * (thr < 0 ? -1 : 1);
+      st.v += (thr * top - st.v) * Math.min(1, dt * (sprint ? 3 : 4));
       st.x += Math.sin(st.h) * st.v * dt; st.z += Math.cos(st.h) * st.v * dt;
       st.x = Math.max(-40, Math.min(40, st.x)); st.z = Math.max(-40, Math.min(40, st.z));
-      pillars.forEach(p => { const dx = st.x - p.position.x, dz = st.z - p.position.z, d = Math.hypot(dx, dz); if (d < 1.35 && d > 0) { st.x = p.position.x + dx / d * 1.35; st.z = p.position.z + dz / d * 1.35; st.v *= .5; } });
-      robot.position.set(st.x, Math.abs(st.v) > .5 && !reduce ? Math.abs(Math.sin(t * 18)) * .04 : 0, st.z);
-      robot.rotation.y = st.h; robot.rotation.z = reduce ? 0 : -turn * Math.min(1, Math.abs(st.v) / 9) * .06;
-      wheels.forEach(w => w.rotation.x += st.v * dt * 2.6);
-      head.rotation.y = reduce ? 0 : Math.sin(t * .8) * .25 * (Math.abs(st.v) < .5 ? 1 : 0);
-      bulb.visible = Math.sin(t * 5) > -.3;
+      if (!st.air) pillars.forEach(p => { const dx = st.x - p.position.x, dz = st.z - p.position.z, d = Math.hypot(dx, dz); if (d < 1.35 && d > 0) { st.x = p.position.x + dx / d * 1.35; st.z = p.position.z + dz / d * 1.35; st.v *= .5; } });
+      // jump + flip
+      if (st.air) {
+        st.vy -= GRAV * dt; st.y += st.vy * dt;
+        const airTime = 2 * 9.5 / GRAV; st.flip = Math.min(1, st.flip + dt / airTime);
+        if (st.y <= 0) { st.y = 0; st.vy = 0; st.air = false; st.flip = 0; st.land = 1; puff(st.x, st.z, 10, 1); }
+      }
+      st.land = Math.max(0, st.land - dt * 5);
+      const e = st.flip < .5 ? 2 * st.flip * st.flip : 1 - Math.pow(-2 * st.flip + 2, 2) / 2;
+      const speedK = Math.min(1, Math.abs(st.v) / 8.5);
+      robot.position.set(st.x, st.y, st.z);
+      robot.rotation.y = st.h;
+      rig.rotation.x = st.air ? st.flipDir * e * Math.PI * 2 : (reduce ? 0 : (sprint ? .22 : .08) * speedK);
+      rig.rotation.z = reduce ? 0 : -turn * speedK * .08;
+      rig.scale.set(1 + st.land * .12, 1 - st.land * .18, 1 + st.land * .12);
+      // walk cycle
+      st.phase += Math.abs(st.v) * dt * 1.25;
+      const amp = st.air ? 0 : Math.min(.9, .25 + speedK * (sprint ? .75 : .5));
+      legs.forEach((L, i) => {
+        const s = Math.sin(st.phase + i * Math.PI);
+        L.hip.rotation.x = st.air ? -.7 : s * amp * (Math.abs(st.v) > .3 ? 1 : 0);
+        L.knee.rotation.x = st.air ? 1.3 : Math.max(0, -Math.cos(st.phase + i * Math.PI)) * amp * 1.3 * (Math.abs(st.v) > .3 ? 1 : 0);
+      });
+      arms.forEach((A, i) => { A.rotation.x = st.air ? -2.4 : -Math.sin(st.phase + i * Math.PI) * amp * .9; A.rotation.z = (i ? -1 : 1) * (st.air ? .5 : .08); });
+      rig.position.y = 1.05 + (Math.abs(st.v) > .3 && !st.air && !reduce ? Math.abs(Math.sin(st.phase)) * .06 : 0);
+      headG.rotation.y = reduce ? 0 : Math.sin(t * .8) * .35 * (Math.abs(st.v) < .5 ? 1 : 0);
+      headG.rotation.x = Math.abs(st.v) < .5 ? Math.sin(t * 1.3) * .05 : 0;
+      const blink = (t % 3.2) < .12 ? .1 : 1; eyes.forEach(m => m.scale.y = blink);
+      bulbs.forEach(b => b.visible = Math.sin(t * 5) > -.3);
+      if (sprint && !st.air && Math.abs(st.v) > 6 && Math.random() < dt * 30) puff(st.x - Math.sin(st.h) * .6, st.z - Math.cos(st.h) * .6, 1, .4);
+      dust.forEach(d => { if (d.life <= 0) return; d.life -= dt * 1.6; d.m.position.x += d.vx * dt; d.m.position.y += d.vy * dt; d.m.position.z += d.vz * dt; d.m.scale.setScalar(.6 + (1 - d.life) * 1.1); d.m.material.opacity = Math.max(0, d.life) * .45; if (d.life <= 0) d.m.visible = false; });
       lidar.position.x = st.x; lidar.position.z = st.z;
       const lp = reduce ? .5 : (t * .7) % 1; lidar.scale.setScalar(1 + lp * 3.5); lidar.material.opacity = .6 * (1 - lp);
       marker.rotation.z = t * 2;
@@ -410,7 +497,7 @@ h1, h2, h3, h4, p { margin: 0; }
       if (best !== near) { near && near.userData.label.classList.remove('hot'); near = best; near && near.userData.label.classList.add('hot'); prompt.hidden = !near; if (near) promptT.textContent = near.userData.p.title; }
       // camera follow
       camPos.set(st.x, innerWidth < 700 ? 17 : 13, st.z + (innerWidth < 700 ? 15 : 12));
-      camera.position.lerp(camPos, Math.min(1, dt * 3)); look.lerp(v3.set(st.x, 0, st.z - 2), Math.min(1, dt * 4)); camera.lookAt(look);
+      camera.position.lerp(camPos, Math.min(1, dt * 3)); look.lerp(v3.set(st.x, st.y * .4, st.z - 2), Math.min(1, dt * 4)); camera.lookAt(look);
       sun.position.set(st.x + 14, 26, st.z + 10); sun.target.position.set(st.x, 0, st.z);
       renderer.render(scene, camera);
       // labels
