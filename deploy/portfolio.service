@@ -1,0 +1,19 @@
+[Unit]
+Description=Yousef portfolio (static Robot Lab site)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=joox
+WorkingDirectory=/home/joox/portfolio/www
+ExecStart=/usr/bin/python3 -m http.server 8093 --bind 127.0.0.1 --directory /home/joox/portfolio/www
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

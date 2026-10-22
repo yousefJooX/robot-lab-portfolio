@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Yousef Mohammed, IoT & AI developer. Illustrated desk that tells the story as you scroll.">
+<style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Yousef Desk Story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an illustrated night-time desk, pinned while you scroll. Each scroll chapter changes what the
+   monitor, the ESP32 board and the phone show, with a caption and the matching projects beside it. */
+:root {
+  --night: #13111d;
+  --wall: #1b1828;
+  --surface: #221f33;
+  --line: #34304a;
+  --fg: #f1ece4;
+  --muted: #a59fb6;
+  --lamp: #ffcf6b;
+  --lamp-ink: #2a1e05;
+  --glow: #6fe3d6;
+  --wood: #6b4a35;
+  --wood-dark: #4a3324;
+  --display: "Fraunces", Georgia, serif;
+  --body: "DM Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 48px);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { background: var(--night); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.6; overflow-x: clip; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3, h4, p { margin: 0; }
+h1, h2, h3 { text-wrap: balance; }
+.mono { font-family: var(--mono); font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.wrap { padding-inline: var(--gutter); max-width: 1280px; margin-inline: auto; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); text-decoration: none; cursor: pointer; font: 600 .88rem var(--body); transition: border-color .2s, transform .2s; }
+.btn:hover { border-color: var(--lamp); transform: translateY(-1px); }
+.btn.primary { background: var(--lamp); color: var(--lamp-ink); border-color: var(--lamp); }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* top */
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-block: 18px; }
+.top b { font-family: var(--display); font-size: 1.3rem; }
+.top b span { color: var(--lamp); }
+
+/* story */
+.stage { position: relative; min-height: 100vh; min-height: 100svh; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr); gap: clamp(20px, 4vw, 56px); align-items: center; padding-block: 24px; }
+.captions { position: relative; min-width: 0; display: grid; gap: 48px; }
+.cap { display: grid; gap: 14px; }
+.cap .k { font: 500 .78rem var(--mono); color: var(--lamp); letter-spacing: .08em; text-transform: uppercase; }
+.cap h2 { font-family: var(--display); font-weight: 800; font-size: clamp(2.2rem, 4.6vw, 3.8rem); line-height: 1.02; letter-spacing: -.01em; }
+.cap h2 em { font-style: italic; color: var(--glow); }
+.cap p { color: var(--muted); max-width: 44ch; }
+.cap .projs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cap .projs button { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.03); cursor: pointer; font: 500 .8rem var(--body); }
+.cap .projs button:hover { border-color: var(--glow); color: var(--glow); }
+.js-pin .captions { display: block; min-height: 420px; }
+.js-pin .cap { position: absolute; inset: 0 0 auto 0; }
+.scene { position: relative; min-width: 0; }
+.scene svg { width: 100%; height: auto; display: block; max-height: 82vh; }
+.chap-nav { position: fixed; right: 16px; top: 50%; transform: translateY(-50%); z-index: 5; display: grid; gap: 10px; }
+.chap-nav button { width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 1px solid var(--muted); background: none; cursor: pointer; position: relative; }
+.chap-nav button.on { background: var(--lamp); border-color: var(--lamp); }
+.chap-nav button span { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); white-space: nowrap; font: 500 .7rem var(--mono); color: var(--muted); opacity: 0; transition: opacity .2s; pointer-events: none; }
+.chap-nav button:hover span, .chap-nav button.on span { opacity: 1; }
+@media (max-width: 860px) {
+  .stage { grid-template-columns: minmax(0, 1fr); align-content: start; gap: 8px; }
+  .scene { order: -1; }
+  .js-pin .captions { min-height: 300px; }
+  .chap-nav { display: none; }
+  .cap h2 { font-size: clamp(1.8rem, 7vw, 2.4rem); }
+}
+/* svg anim */
+.steam path { animation: steam 3s ease-in-out infinite; }
+.steam path:nth-child(2) { animation-delay: .8s; }
+@keyframes steam { 0% { opacity: 0; transform: translateY(6px); } 40% { opacity: .6; } 100% { opacity: 0; transform: translateY(-14px); } }
+.star { animation: tw 3s ease-in-out infinite; }
+@keyframes tw { 50% { opacity: .2; } }
+.cursor-blink { animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* everything section */
+.all { padding-block: 96px 64px; display: grid; gap: 64px; }
+.all h2.big { font-family: var(--display); font-weight: 800; font-size: clamp(2.6rem, 6vw, 4.6rem); line-height: 1; }
+.all h2.big span { color: var(--lamp); font-style: italic; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.card { display: grid; gap: 10px; align-content: start; text-align: left; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color .2s, transform .2s; }
+.card:hover, .card:focus-visible { border-color: var(--lamp); transform: translateY(-3px); }
+.card .t { font: 500 .7rem var(--mono); color: var(--glow); text-transform: uppercase; letter-spacing: .06em; }
+.card h3 { font-family: var(--display); font-weight: 600; font-size: 1.3rem; line-height: 1.15; }
+.card .m { font-family: var(--display); font-weight: 800; font-size: 1.8rem; color: var(--lamp); line-height: 1; }
+.card p { color: var(--muted); font-size: .9rem; }
+.exp { display: grid; gap: 12px; }
+.exp div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.exp b { font-family: var(--display); font-size: 1.25rem; font-weight: 600; display: block; }
+.exp span { color: var(--muted); font-size: .92rem; }
+@media (max-width: 560px) { .exp div { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+.contact { padding: clamp(24px, 5vw, 48px); border-radius: 20px; background: linear-gradient(135deg, var(--surface), var(--wall)); border: 1px solid var(--line); display: grid; gap: 16px; }
+.contact code { font: 500 1.1rem var(--mono); user-select: all; overflow-wrap: anywhere; }
+footer { padding-block: 24px 40px; color: var(--muted); font-size: .85rem; }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(5,4,10,.55); backdrop-filter: blur(3px); opacity: 0; transition: opacity .3s; }
+.scrim.on { opacity: 1; }
+.drawer { position: fixed; z-index: 41; top: 0; right: 0; bottom: 0; width: min(760px, 100%); overflow: auto; overscroll-behavior: contain; background: var(--night); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+.drawer.on { transform: none; }
+.dbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: calc(12px + env(safe-area-inset-top, 0px)) 22px 12px; background: rgba(19,17,29,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.dbody { padding: 28px 22px calc(48px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 28px; }
+.dbody h2 { font-family: var(--display); font-weight: 800; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.02; }
+.dbody .summary { color: var(--muted); font-size: 1.04rem; }
+.status { font: 500 .74rem var(--mono); color: var(--lamp); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.kpi { padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: grid; gap: 4px; min-width: 0; }
+.kpi b { font-family: var(--display); font-weight: 800; font-size: 1.6rem; line-height: 1.05; color: var(--lamp); overflow-wrap: anywhere; }
+.sub { font-family: var(--display); font-weight: 600; font-size: 1.4rem; margin-bottom: 12px; }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; counter-reset: s; }
+.flow li { counter-increment: s; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding-bottom: 16px; position: relative; }
+.flow li::before { content: counter(s); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--lamp); color: var(--lamp-ink); font: 600 .78rem var(--mono); }
+.flow li:not(:last-child)::after { content: ""; position: absolute; left: 13px; top: 32px; bottom: 4px; width: 1px; background: var(--line); }
+.flow h4 { font-weight: 600; }
+.flow p { color: var(--muted); font-size: .93rem; }
+.notes { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--muted); font-size: .94rem; }
+.notes b { color: var(--fg); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.chips li { list-style: none; font: .74rem var(--mono); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); }
+.bars { display: grid; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 100px) minmax(0, 1fr) 54px; gap: 10px; align-items: center; font-size: .84rem; }
+.trk { height: 8px; background: var(--surface); border-radius: 999px; overflow: hidden; }
+.fill { display: block; height: 100%; background: var(--muted); border-radius: 999px; }
+.bar-row.best .fill { background: var(--lamp); }
+.bar-row .v { font: 500 .76rem var(--mono); text-align: right; }
+.bar-row.best .v, .bar-row.best .l { color: var(--lamp); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap top"><b>Yousef<span>.</span></b><a class="btn" href="#all">Skip to all projects ↓</a></div>
+
+<div class="wrap" id="story">
+  <div class="stage" id="stage">
+    <div class="captions" id="captions"></div>
+    <div class="scene" aria-hidden="true">
+      <svg viewBox="0 0 800 600" id="svg">
+        <defs>
+          <radialGradient id="lampLight" cx="50%" cy="0%" r="100%"><stop offset="0" stop-color="#ffcf6b" stop-opacity=".55"/><stop offset="1" stop-color="#ffcf6b" stop-opacity="0"/></radialGradient>
+          <radialGradient id="screenGlow" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#6fe3d6" stop-opacity=".25"/><stop offset="1" stop-color="#6fe3d6" stop-opacity="0"/></radialGradient>
+          <clipPath id="scr"><rect x="262" y="172" width="316" height="196" rx="4"/></clipPath>
+          <clipPath id="phs"><rect x="153" y="404" width="58" height="24" rx="3"/></clipPath>
+        </defs>
+        <!-- wall + window -->
+        <rect width="800" height="600" fill="#1b1828"/>
+        <rect x="40" y="40" width="170" height="200" rx="8" fill="#0f0d18" stroke="#34304a" stroke-width="6"/>
+        <line x1="125" y1="40" x2="125" y2="240" stroke="#34304a" stroke-width="4"/>
+        <line x1="40" y1="140" x2="210" y2="140" stroke="#34304a" stroke-width="4"/>
+        <circle cx="170" cy="85" r="18" fill="#f1ece4" opacity=".9"/><circle cx="178" cy="80" r="16" fill="#0f0d18"/>
+        <circle class="star" cx="70" cy="70" r="2" fill="#f1ece4"/><circle class="star" cx="100" cy="110" r="1.5" fill="#f1ece4" style="animation-delay:1s"/><circle class="star" cx="60" cy="190" r="1.8" fill="#f1ece4" style="animation-delay:2s"/><circle class="star" cx="190" cy="200" r="1.5" fill="#f1ece4" style="animation-delay:.5s"/>
+        <!-- shelf -->
+        <rect x="560" y="90" width="200" height="10" rx="2" fill="#4a3324"/>
+        <rect x="575" y="48" width="16" height="42" fill="#6fe3d6" opacity=".7"/><rect x="594" y="56" width="14" height="34" fill="#ffcf6b" opacity=".8"/><rect x="611" y="44" width="18" height="46" fill="#a59fb6" opacity=".6"/>
+        <rect x="640" y="62" width="40" height="28" rx="4" fill="#34304a"/><text x="660" y="81" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" fill="#ffcf6b">ROS 2</text>
+        <path d="M712 90 q-6 -26 8 -40 q4 18 -2 40z" fill="#3f7a5a"/><path d="M724 90 q10 -24 -2 -44 q-8 20 -4 44z" fill="#4f9a6f"/><rect x="706" y="78" width="28" height="14" rx="3" fill="#6b4a35"/>
+        <!-- lamp light -->
+        <polygon id="cone" points="120,170 30,450 260,450" fill="url(#lampLight)" opacity=".15"/>
+        <!-- desk -->
+        <rect x="0" y="450" width="800" height="22" fill="#6b4a35"/>
+        <rect x="0" y="472" width="800" height="128" fill="#13111d"/>
+        <rect x="40" y="472" width="16" height="128" fill="#4a3324"/><rect x="744" y="472" width="16" height="128" fill="#4a3324"/>
+        <!-- lamp -->
+        <rect x="96" y="440" width="50" height="10" rx="3" fill="#34304a"/>
+        <line x1="121" y1="440" x2="98" y2="300" stroke="#34304a" stroke-width="6" stroke-linecap="round"/>
+        <line x1="98" y1="300" x2="130" y2="190" stroke="#34304a" stroke-width="6" stroke-linecap="round"/>
+        <path d="M100 178 L150 166 L142 196 Z" fill="#4a4363"/>
+        <circle id="bulb" cx="128" cy="188" r="6" fill="#ffcf6b" opacity=".3"/>
+        <!-- monitor -->
+        <rect x="360" y="380" width="20" height="62" fill="#2a2740"/><rect x="330" y="438" width="80" height="12" rx="4" fill="#2a2740"/>
+        <rect x="250" y="160" width="340" height="220" rx="12" fill="#0b0a12" stroke="#34304a" stroke-width="4"/>
+        <ellipse id="glow" cx="420" cy="270" rx="260" ry="190" fill="url(#screenGlow)" opacity="0"/>
+        <g clip-path="url(#scr)">
+          <rect x="262" y="172" width="316" height="196" fill="#0e1018"/>
+          <!-- code layer -->
+          <g id="L-code">
+            <g font-family="DM Mono, monospace" font-size="11">
+              <text x="274" y="194" fill="#a59fb6">$ whoami</text>
+              <text x="274" y="212" fill="#f1ece4">yousef · iot &amp; ai developer</text>
+              <text x="274" y="230" fill="#a59fb6">$ cat focus.txt</text>
+              <text x="274" y="248" fill="#6fe3d6">computer vision · rag · embedded ml</text>
+              <text x="274" y="266" fill="#a59fb6">$ ls projects/ | wc -l</text>
+              <text x="274" y="284" fill="#ffcf6b" id="projcount">16</text>
+              <text x="274" y="302" fill="#a59fb6">$ <tspan class="cursor-blink" fill="#ffcf6b">▋</tspan></text>
+            </g>
+          </g>
+          <!-- face layer -->
+          <g id="L-face" opacity="0">
+            <rect x="262" y="172" width="316" height="196" fill="#151826"/>
+            <g id="facedots"></g>
+            <rect id="fbox" x="355" y="190" width="130" height="160" fill="none" stroke="#ffcf6b" stroke-width="2"/>
+            <rect x="355" y="178" width="74" height="13" fill="#ffcf6b"/><text x="359" y="188" font-family="DM Mono, monospace" font-size="9" fill="#2a1e05">face · 0.97</text>
+            <text x="270" y="360" font-family="DM Mono, monospace" font-size="9" fill="#6fe3d6">468 landmarks · 30 fps</text>
+          </g>
+          <!-- rag layer -->
+          <g id="L-rag" opacity="0" font-family="DM Sans, sans-serif" font-size="11">
+            <rect x="262" y="172" width="316" height="196" fill="#12101c"/>
+            <rect x="380" y="186" width="186" height="34" rx="10" fill="#34304a"/>
+            <text x="556" y="207" text-anchor="end" fill="#f1ece4" font-family="Noto Kufi Arabic, sans-serif" direction="rtl">ما شروط الحضانة؟</text>
+            <g id="ragsteps" font-family="DM Mono, monospace" font-size="9">
+              <rect x="274" y="232" width="78" height="20" rx="10" fill="none" stroke="#6fe3d6"/><text x="313" y="245" text-anchor="middle" fill="#6fe3d6">retrieve · 20</text>
+              <rect x="358" y="232" width="78" height="20" rx="10" fill="none" stroke="#6fe3d6"/><text x="397" y="245" text-anchor="middle" fill="#6fe3d6">rerank · 5</text>
+              <rect x="442" y="232" width="78" height="20" rx="10" fill="#ffcf6b"/><text x="481" y="245" text-anchor="middle" fill="#2a1e05">answer</text>
+            </g>
+            <rect x="274" y="264" width="232" height="58" rx="10" fill="#221f33"/>
+            <rect x="286" y="276" width="196" height="6" rx="3" fill="#a59fb6" opacity=".7"/>
+            <rect x="286" y="290" width="170" height="6" rx="3" fill="#a59fb6" opacity=".5"/>
+            <rect x="286" y="304" width="120" height="6" rx="3" fill="#a59fb6" opacity=".4"/>
+            <text x="274" y="342" font-family="DM Mono, monospace" font-size="9" fill="#ffcf6b">sources: 188 law articles · faiss · bge-m3</text>
+          </g>
+          <!-- chart layer -->
+          <g id="L-chart" opacity="0" font-family="DM Mono, monospace" font-size="9">
+            <rect x="262" y="172" width="316" height="196" fill="#0e1018"/>
+            <text x="274" y="192" fill="#a59fb6">nyc-taxi · test RMSE (lower is better)</text>
+            <g id="bars"></g>
+            <line x1="274" y1="340" x2="566" y2="340" stroke="#34304a"/>
+          </g>
+          <!-- hello layer -->
+          <g id="L-hello" opacity="0">
+            <rect x="262" y="172" width="316" height="196" fill="#0e1018"/>
+            <text x="420" y="255" text-anchor="middle" font-family="Fraunces, serif" font-weight="800" font-size="34" fill="#f1ece4">Let's build</text>
+            <text x="420" y="292" text-anchor="middle" font-family="Fraunces, serif" font-style="italic" font-weight="800" font-size="30" fill="#ffcf6b">something live.</text>
+            <text x="420" y="330" text-anchor="middle" font-family="DM Mono, monospace" font-size="11" fill="#6fe3d6">ym9159303@gmail.com</text>
+          </g>
+        </g>
+        <!-- keyboard + mug -->
+        <rect x="300" y="438" width="0" height="0"/>
+        <rect x="430" y="436" width="120" height="14" rx="3" fill="#2a2740"/>
+        <rect x="660" y="414" width="34" height="36" rx="4" fill="#a59fb6"/><path d="M694 422 q14 2 0 18" stroke="#a59fb6" stroke-width="4" fill="none"/>
+        <g class="steam" stroke="#f1ece4" stroke-width="2" fill="none" opacity=".5" stroke-linecap="round"><path d="M670 406 q-6 -10 0 -18"/><path d="M682 406 q6 -10 0 -18"/></g>
+        <!-- phone -->
+        <rect x="150" y="400" width="64" height="32" rx="6" fill="#0b0a12" stroke="#34304a" stroke-width="2"/>
+        <g clip-path="url(#phs)"><rect id="phone" x="153" y="404" width="58" height="24" fill="#6fe3d6" opacity=".05"/>
+          <g id="phui" opacity="0"><rect x="157" y="408" width="26" height="4" rx="2" fill="#13111d"/><rect x="157" y="415" width="40" height="3" rx="1.5" fill="#13111d" opacity=".6"/><rect x="157" y="421" width="34" height="3" rx="1.5" fill="#13111d" opacity=".6"/></g></g>
+        <!-- esp32 board -->
+        <g id="esp">
+          <rect x="560" y="426" width="70" height="24" rx="3" fill="#1d3a4a" stroke="#2c5a70"/>
+          <rect x="574" y="430" width="30" height="16" rx="2" fill="#2a2740"/>
+          <circle id="led1" cx="612" cy="434" r="3" fill="#34304a"/><circle id="led2" cx="621" cy="434" r="3" fill="#34304a"/><circle id="led3" cx="616" cy="443" r="3" fill="#34304a"/>
+          <path id="wire" d="M630 440 C 660 440, 650 470, 700 470" stroke="#ffcf6b" stroke-width="2" fill="none" stroke-dasharray="6 6" opacity=".2"/>
+          <rect x="698" y="440" width="24" height="12" rx="2" fill="#34304a"/>
+          <rect id="gate" x="710" y="436" width="60" height="5" rx="2" fill="#ffcf6b" opacity=".5" style="transform-box:fill-box;transform-origin:0% 50%"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</div>
+<nav class="chap-nav" id="chap-nav" aria-label="Chapters"></nav>
+
+<div class="wrap all" id="all">
+  <div style="display:grid;gap:14px">
+    <span class="mono">The whole desk, in one place</span>
+    <h2 class="big">Every project, <span>with how it works.</span></h2>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div style="display:grid;gap:14px">
+    <h2 class="big" style="font-size:clamp(2rem,4vw,3rem)">Experience</h2>
+    <div class="exp" id="exp"></div>
+  </div>
+  <div class="contact">
+    <span class="mono">Contact</span>
+    <h2 class="big" style="font-size:clamp(2rem,5vw,3.4rem)">Let's build something <span>that runs live.</span></h2>
+    <div class="row-btns" style="align-items:center"><code id="email"></code><button class="btn" type="button" id="copy">Copy email</button></div>
+    <div class="row-btns" id="links"></div>
+  </div>
+</div>
+<footer class="wrap">Illustrated scroll story inspired by the classic desk-scene portfolios on GitHub, drawn and coded from scratch.</footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title" hidden>
+  <div class="dbar"><span class="mono" id="d-pos"></span><div class="row-btns"><button class="btn" type="button" id="d-prev">←</button><button class="btn" type="button" id="d-next">→</button><button class="btn" type="button" id="d-close">Close</button></div></div>
+  <div class="dbody" id="d-body"></div>
+</aside>
+
+<script src="../data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pad = n => String(n).padStart(2, '0');
+  const $ = s => document.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const P = id => PROJECTS.find(p => p.id === id);
+
+  const CHAPTERS = [
+    { k: '00 · evening', h: 'Hi, I\'m <em>Yousef</em>.', p: 'IoT & AI developer at VoltX and final-year CS (Robotics & AI) at Helwan National University. Scroll, and my desk will show you what I build.', projs: [] , layer: 'code' },
+    { k: '01 · vision', h: 'I teach cameras to <em>see</em>.', p: 'Hand and face tracking that runs live on a laptop CPU, and a YOLOv11 detector for industrial safety.', projs: ['finger-frame', 'ar-face', 'air-canvas', 'gas-cylinder'], layer: 'face' },
+    { k: '02 · language', h: 'I make models <em>read</em> and answer.', p: 'Retrieval-augmented systems in Arabic and English, story-length image captions, and an LLM built from scratch.', projs: ['egyptian-rag', 'telecom-rag', 'mini-rag', 'llm-scratch', 'story-captioning', 'nmt', 'multimodal-captioning'], layer: 'rag' },
+    { k: '03 · hardware', h: 'I wire models into <em>hardware</em>.', p: 'ESP32 boards on FreeRTOS: sensors on one core, networking on the other, and a gate that never waits for Wi-Fi.', projs: ['smart-parking'], layer: 'code', esp: true },
+    { k: '04 · numbers', h: 'I <em>measure</em> everything.', p: 'Leakage-safe pipelines and honest benchmarks. On NYC taxi trips, XGBoost beat four other models on held-out data.', projs: ['nyc-taxi', 'segmentation', 'titanic'], layer: 'chart' },
+    { k: '05 · shipping', h: 'I ship tools people <em>use</em>.', p: 'StudyHub is a self-hosted study workspace my friends and classmates use every day, installed as an app on their phones.', projs: ['studyhub'], layer: 'code', phone: true },
+    { k: '06 · late night', h: 'Let\'s build something <em>live</em>.', p: EMAIL, projs: [], layer: 'hello', contact: true }
+  ];
+  $('#captions').innerHTML = CHAPTERS.map((c, i) => `<div class="cap" data-i="${i}"><span class="k">${esc(c.k)}</span><h2>${c.h}</h2><p>${esc(c.p)}</p>${c.projs.length ? `<div class="projs">${c.projs.map(id => P(id) ? `<button type="button" data-proj="${id}">${esc(P(id).title)} ↗</button>` : '').join('')}</div>` : ''}${c.contact ? `<div class="row-btns"><a class="btn primary" href="${LINKS.linkedin}" target="_blank" rel="noopener">LinkedIn ↗</a><a class="btn" href="${LINKS.github}" target="_blank" rel="noopener">GitHub ↗</a></div>` : ''}</div>`).join('');
+  $('#projcount').textContent = PROJECTS.length;
+
+  // face dots
+  const fd = $('#facedots');
+  for (let i = 0; i < 150; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random());
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', (420 + Math.cos(a) * r * 55).toFixed(1)); c.setAttribute('cy', (272 + Math.sin(a) * r * 72).toFixed(1));
+    c.setAttribute('r', '1.4'); c.setAttribute('fill', i % 5 ? '#6fe3d6' : '#ffcf6b'); fd.appendChild(c);
+  }
+  [[398, 258], [442, 258]].forEach(([x, y]) => { for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', (x + Math.cos(a) * 11).toFixed(1)); c.setAttribute('cy', (y + Math.sin(a) * 5).toFixed(1)); c.setAttribute('r', '1.6'); c.setAttribute('fill', '#ffcf6b'); fd.appendChild(c); } });
+  // bars (to scale: height = rmse / 0.5 * 120)
+  const bars = PROJECTS.find(p => p.id === 'nyc-taxi').bars.items, bg = $('#bars');
+  bars.forEach(([l, v], i) => {
+    const x = 290 + i * 56, h = v / .5 * 120, best = v === Math.min(...bars.map(b => b[1]));
+    bg.insertAdjacentHTML('beforeend', `<rect class="bar" x="${x}" y="${340 - h}" width="34" height="${h}" rx="3" fill="${best ? '#ffcf6b' : '#a59fb6'}" style="transform-box:fill-box;transform-origin:50% 100%"/><text x="${x + 17}" y="${334 - h}" text-anchor="middle" fill="${best ? '#ffcf6b' : '#a59fb6'}">${v}</text><text x="${x + 17}" y="354" text-anchor="middle" fill="#a59fb6">${esc(l.split(' ')[0])}</text>`);
+  });
+
+  /* all-projects section */
+  $('#cards').innerHTML = PROJECTS.map(p => `<button class="card" type="button" data-proj="${p.id}"><span class="t">${esc(p.tag)}</span><span class="m">${esc(p.big)}</span><h3>${esc(p.title)}</h3><p>${esc(p.summary.split('. ')[0])}.</p></button>`).join('');
+  $('#exp').innerHTML = EXPERIENCE.map(x => `<div><span class="mono">${esc(x.when)}</span><span><b>${esc(x.role)}</b><span>${esc(x.org)} · ${esc(x.note)}</span></span></div>`).join('');
+  $('#email').textContent = EMAIL;
+  $('#links').innerHTML = `<a class="btn primary" href="${LINKS.linkedin}" target="_blank" rel="noopener">LinkedIn ↗</a><a class="btn" href="${LINKS.github}" target="_blank" rel="noopener">GitHub ↗</a><a class="btn" href="${LINKS.kaggle}" target="_blank" rel="noopener">Kaggle ↗</a>`;
+  const cb = $('#copy');
+  cb.addEventListener('click', () => {
+    const ok = () => { cb.textContent = 'Copied'; setTimeout(() => cb.textContent = 'Copy email', 1600); };
+    const fb = () => { const r = document.createRange(); r.selectNodeContents($('#email')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); cb.textContent = 'Press Ctrl+C'; };
+    try { navigator.clipboard.writeText(EMAIL).then(ok, fb); } catch { fb(); }
+  });
+
+  /* drawer */
+  const drawer = $('#drawer'), scrim = $('#scrim'), body = $('#d-body');
+  let cur = -1, lastFocus = null;
+  function caseHTML(p) {
+    const code = p.repo ? `<a class="btn primary" href="${p.repo}" target="_blank" rel="noopener">View code on GitHub ↗</a>` : p.repoAlt ? `<a class="btn primary" href="${p.repoAlt[1]}" target="_blank" rel="noopener">${esc(p.repoAlt[0])} ↗</a>` : `<span class="btn" aria-disabled="true">${esc(p.repoNote || 'Private repo')}</span>`;
+    const extra = p.extra ? `<a class="btn" href="${p.extra[1]}" target="_blank" rel="noopener">${esc(p.extra[0])} ↗</a>` : '';
+    let b = '';
+    if (p.bars) { const vals = p.bars.items.map(i => i[1]), max = Math.max(...vals), best = p.bars.better === 'low' ? Math.min(...vals) : max;
+      b = `<div><h3 class="sub">Numbers</h3><div class="bars"><span class="mono">${esc(p.bars.cap)}</span>${p.bars.items.map(([l, v]) => `<div class="bar-row ${v === best ? 'best' : ''}"><span class="l">${esc(l)}</span><span class="trk"><span class="fill" style="width:${(v / max * 100).toFixed(1)}%"></span></span><span class="v">${v}${p.bars.unit ? ' ' + p.bars.unit : ''}</span></div>`).join('')}</div></div>`; }
+    return `<div style="display:grid;gap:12px"><span class="mono" style="color:var(--glow)">${esc(p.tag)}</span>${p.status ? `<span class="status">● ${esc(p.status)}</span>` : ''}<h2 id="d-title">${esc(p.title)}</h2><p class="summary">${esc(p.summary)}</p><div class="row-btns">${code}${extra}</div></div>
+      <div class="kpis">${p.kpis.map(([v, l]) => `<div class="kpi"><b>${esc(v)}</b><span class="mono">${esc(l)}</span></div>`).join('')}</div>
+      <div><h3 class="sub">How it works</h3><ol class="flow">${p.flow.map(([h, d]) => `<li><span><h4>${esc(h)}</h4><p>${esc(d)}</p></span></li>`).join('')}</ol></div>
+      ${b}${p.notes.length ? `<div><h3 class="sub">Decisions</h3><ul class="notes">${p.notes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
+      <div><h3 class="sub">Stack</h3><ul class="chips">${p.stack.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>`;
+  }
+  function show(i) { cur = (i + PROJECTS.length) % PROJECTS.length; body.innerHTML = caseHTML(PROJECTS[cur]); $('#d-pos').textContent = pad(cur + 1) + ' / ' + pad(PROJECTS.length); drawer.scrollTop = 0; }
+  function openDrawer(id) { const i = PROJECTS.findIndex(p => p.id === id); if (i < 0) return; lastFocus = document.activeElement; show(i); drawer.hidden = false; scrim.hidden = false; document.body.style.overflow = 'hidden'; requestAnimationFrame(() => { drawer.classList.add('on'); scrim.classList.add('on'); }); $('#d-close').focus({ preventScroll: true }); }
+  function closeDrawer() { drawer.classList.remove('on'); scrim.classList.remove('on'); document.body.style.overflow = ''; setTimeout(() => { drawer.hidden = true; scrim.hidden = true; }, 450); lastFocus && lastFocus.focus({ preventScroll: true }); }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-proj]'); if (b) openDrawer(b.dataset.proj); });
+  $('#d-close').addEventListener('click', closeDrawer); scrim.addEventListener('click', closeDrawer);
+  $('#d-prev').addEventListener('click', () => show(cur - 1)); $('#d-next').addEventListener('click', () => show(cur + 1));
+  addEventListener('keydown', e => { if (drawer.hidden) return; if (e.key === 'Escape') closeDrawer(); if (e.key === 'ArrowRight') show(cur + 1); if (e.key === 'ArrowLeft') show(cur - 1); });
+
+  /* story choreography */
+  if (!window.gsap || !window.ScrollTrigger || reduce) {
+    $('#cone').setAttribute('opacity', '1'); $('#bulb').setAttribute('opacity', '1'); $('#glow').setAttribute('opacity', '1');
+    return; // captions stay stacked in normal flow
+  }
+  gsap.registerPlugin(ScrollTrigger);
+  document.body.classList.add('js-pin');
+  const caps = gsap.utils.toArray('.cap');
+  gsap.set(caps, { autoAlpha: 0, y: 30 }); gsap.set(caps[0], { autoAlpha: 1, y: 0 });
+  const layers = { code: '#L-code', face: '#L-face', rag: '#L-rag', chart: '#L-chart', hello: '#L-hello' };
+  const nav = $('#chap-nav');
+  nav.innerHTML = CHAPTERS.map((c, i) => `<button type="button" data-c="${i}" aria-label="${esc(c.k)}"><span>${esc(c.k)}</span></button>`).join('');
+  const tl = gsap.timeline({ defaults: { ease: 'power2.inOut' },
+    scrollTrigger: { trigger: '#stage', start: 'top top', end: '+=' + CHAPTERS.length * 90 + '%', pin: true, scrub: 1, snap: { snapTo: 'labels', duration: { min: .2, max: .8 }, ease: 'power2.inOut' },
+      onUpdate: self => { const i = Math.round(self.progress * (CHAPTERS.length - 1)); nav.querySelectorAll('button').forEach((b, n) => b.classList.toggle('on', n === i)); } } });
+  // ch0: lamp on, screen glow
+  tl.addLabel('c0').to('#cone', { attr: { opacity: 1 }, duration: .5 }, 'c0').to('#bulb', { attr: { opacity: 1 }, duration: .5 }, 'c0').to('#glow', { attr: { opacity: 1 }, duration: .5 }, 'c0');
+  let prevLayer = 'code';
+  CHAPTERS.forEach((c, i) => {
+    if (!i) return;
+    const L = 'c' + i;
+    tl.addLabel(L, '+=.6');
+    tl.to(caps[i - 1], { autoAlpha: 0, y: -30, duration: .4 }, L).to(caps[i], { autoAlpha: 1, y: 0, duration: .4 }, L + '+=.3');
+    if (c.layer !== prevLayer) { tl.to(layers[prevLayer], { opacity: 0, duration: .4 }, L).to(layers[c.layer], { opacity: 1, duration: .4 }, L + '+=.2'); prevLayer = c.layer; }
+    if (c.layer === 'face') tl.fromTo('#facedots circle', { opacity: 0 }, { opacity: 1, stagger: .002, duration: .3 }, L + '+=.3').fromTo('#fbox', { attr: { width: 30, height: 30, x: 405, y: 255 } }, { attr: { width: 130, height: 160, x: 355, y: 190 }, duration: .5 }, L + '+=.3');
+    if (c.layer === 'rag') tl.fromTo('#ragsteps rect, #ragsteps text', { opacity: 0 }, { opacity: 1, stagger: .08, duration: .2 }, L + '+=.4');
+    if (c.esp) tl.to(['#led1', '#led2', '#led3'], { attr: { fill: '#6fdc9a' }, stagger: .1, duration: .2 }, L + '+=.2').to('#wire', { attr: { opacity: 1 }, strokeDashoffset: -60, duration: .6 }, L + '+=.2').to('#gate', { rotation: -60, attr: { opacity: 1 }, duration: .5 }, L + '+=.4');
+    if (c.layer === 'chart') tl.fromTo('#bars .bar', { scaleY: 0 }, { scaleY: 1, stagger: .08, duration: .5 }, L + '+=.3');
+    if (c.phone) tl.to('#phone', { attr: { opacity: 1 }, duration: .4 }, L + '+=.2').to('#phui', { attr: { opacity: 1 }, duration: .3 }, L + '+=.4');
+    if (c.contact) tl.to('#cone', { attr: { opacity: .5 }, duration: .4 }, L);
+  });
+  tl.addLabel('end', '+=.6');
+  nav.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const st = tl.scrollTrigger; const pos = st.start + (st.end - st.start) * (tl.labels['c' + b.dataset.c] / tl.duration()); scrollTo({ top: pos + 2, behavior: 'smooth' }); });
+})();
+</script>
+
+</body>
+</html>

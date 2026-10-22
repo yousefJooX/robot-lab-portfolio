@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Yousef Mohammed, IoT & AI developer. Drive a robot through a 3D lab of projects.">
+<style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Yousef Robot Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a drivable 3D robotics lab. Zones on the floor are project categories; each project is a pillar.
+   HTML panels (zone list, case study) slide over the WebGL scene. */
+:root {
+  --bg: #0b0d12;
+  --surface: #12151c;
+  --surface-2: #1a1e27;
+  --line: #262b36;
+  --fg: #ece8e1;
+  --muted: #8c919b;
+  --accent: #ffb547;
+  --accent-ink: #1a1203;
+  --cool: #7cc4ff;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55; overflow: hidden; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3, h4, p { margin: 0; }
+.mono { font-family: var(--mono); font-size: .72rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.disp { font-family: var(--display); font-weight: 900; text-transform: uppercase; line-height: .9; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+#scene.hov { cursor: pointer; }
+
+/* HUD */
+.hud-tl { position: fixed; z-index: 5; top: calc(14px + env(safe-area-inset-top, 0px)); left: 16px; display: grid; gap: 4px; pointer-events: none; }
+.hud-tl .disp { font-size: 1.6rem; }
+.hud-tl .disp span { color: var(--accent); }
+.zone-now { font-family: var(--mono); font-size: .8rem; color: var(--fg); }
+.zone-now b { color: var(--accent); font-weight: 500; }
+.hud-tr { position: fixed; z-index: 5; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; display: grid; gap: 8px; justify-items: end; }
+#minimap { width: 150px; height: 150px; border-radius: 12px; border: 1px solid var(--line); background: rgba(11,13,18,.7); backdrop-filter: blur(8px); display: block; }
+.tbtn { display: inline-flex; gap: 8px; align-items: center; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: rgba(18,21,28,.8); backdrop-filter: blur(8px); cursor: pointer; font: 500 .74rem var(--mono); text-transform: uppercase; letter-spacing: .06em; text-decoration: none; }
+.tbtn:hover { border-color: var(--accent); color: var(--accent); }
+.tbtn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hud-bl { position: fixed; z-index: 5; left: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; pointer-events: none; }
+.key { font: 500 .7rem var(--mono); padding: 4px 8px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; background: var(--surface); }
+@media (max-width: 700px) { #minimap { width: 110px; height: 110px; } .hud-bl .k-desk { display: none; } }
+
+/* floating labels */
+.labels { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+.zl { position: absolute; transform: translate(-50%, -100%); text-align: center; white-space: nowrap; }
+.zl .n { font-family: var(--display); font-weight: 900; font-size: 1.5rem; text-transform: uppercase; line-height: 1; text-shadow: 0 2px 14px #000; }
+.zl .c { font: 500 .66rem var(--mono); color: var(--accent); letter-spacing: .08em; text-transform: uppercase; }
+.pl { position: absolute; transform: translate(-50%, -100%); font: 500 .68rem var(--mono); padding: 3px 8px; border-radius: 4px; background: rgba(11,13,18,.85); border: 1px solid var(--line); white-space: nowrap; transition: background .15s, color .15s; }
+.pl.hot { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* prompt */
+.prompt { position: fixed; z-index: 6; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 10px 12px 10px 16px; border-radius: 999px; background: rgba(18,21,28,.92); border: 1px solid var(--accent); max-width: calc(100% - 32px); }
+.prompt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-weight: 600; }
+
+/* zone panel */
+.panel { position: fixed; z-index: 7; right: 16px; top: 190px; width: min(360px, calc(100% - 32px)); max-height: calc(100% - 270px); overflow: auto; padding: 18px; border-radius: 14px; background: rgba(18,21,28,.88); backdrop-filter: blur(14px); border: 1px solid var(--line); display: grid; gap: 12px; }
+.panel h2 { font-size: 2rem; }
+.panel p { color: var(--muted); font-size: .9rem; }
+.plist { display: grid; gap: 6px; }
+.pitem { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; }
+.pitem:hover, .pitem:focus-visible { border-color: var(--accent); }
+.pitem b { display: block; font-weight: 600; font-size: .92rem; line-height: 1.25; }
+.pitem small { font: .66rem var(--mono); color: var(--cool); text-transform: uppercase; letter-spacing: .06em; }
+.pitem .v { font-family: var(--display); font-weight: 700; font-size: 1.2rem; color: var(--accent); }
+.links { display: flex; flex-wrap: wrap; gap: 6px; }
+.jl { display: grid; gap: 10px; }
+.jl div { padding-left: 12px; border-left: 2px solid var(--accent); }
+.jl b { display: block; font-weight: 600; }
+.jl span { font-size: .84rem; color: var(--muted); }
+@media (max-width: 700px) { .panel { top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); right: 12px; left: 12px; width: auto; max-height: 42%; } }
+
+/* intro */
+.intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: radial-gradient(circle at 50% 40%, rgba(11,13,18,.55), rgba(11,13,18,.92)); }
+.intro-card { max-width: 560px; display: grid; gap: 18px; text-align: center; justify-items: center; }
+.intro h1 { font-size: clamp(3.6rem, 13vw, 7rem); }
+.intro h1 span { color: var(--accent); }
+.intro p { color: var(--muted); max-width: 46ch; }
+.intro .keys { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+/* modal (case + list) */
+.modal { position: fixed; inset: 0; z-index: 30; overflow: auto; overscroll-behavior: contain; background: rgba(8,9,13,.9); backdrop-filter: blur(16px); }
+.modal-in { max-width: 1040px; margin-inline: auto; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(48px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 28px; }
+.mbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 10px; align-items: center; padding-block: 10px; background: linear-gradient(rgba(8,9,13,1) 70%, transparent); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); text-decoration: none; cursor: pointer; font: 600 .9rem var(--body); }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.case h2 { font-size: clamp(2.6rem, 7vw, 5rem); }
+.case .summary { font-size: 1.05rem; max-width: 64ch; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-block: 1px solid var(--line); }
+.kpi { padding: 16px 12px 16px 0; display: grid; gap: 4px; min-width: 0; }
+.kpi b { font-family: var(--display); font-weight: 700; font-size: 2.1rem; line-height: 1; color: var(--accent); overflow-wrap: anywhere; }
+.sub { font-family: var(--display); font-weight: 900; font-size: 1.8rem; text-transform: uppercase; margin-bottom: 14px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 36px; align-items: start; }
+.flow { list-style: none; margin: 0; padding: 0 0 0 30px; position: relative; display: grid; }
+.flow::before { content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 1px; background: linear-gradient(var(--accent), var(--cool)); }
+.flow li { position: relative; padding-bottom: 16px; }
+.flow li::before { content: ""; position: absolute; left: -30px; top: 5px; width: 11px; height: 11px; border-radius: 3px; border: 2px solid var(--accent); background: var(--bg); }
+.flow h4 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; text-transform: uppercase; line-height: 1.1; }
+.flow p { color: var(--muted); font-size: .92rem; }
+.notes { margin: 0; padding: 0; display: grid; gap: 10px; }
+.notes li { list-style: none; position: relative; padding-left: 20px; font-size: .93rem; }
+.notes li::before { content: "▸"; position: absolute; left: 0; color: var(--cool); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0; }
+.chips li { list-style: none; font: .72rem var(--mono); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); }
+.bars { display: grid; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 96px) minmax(0, 1fr) 54px; gap: 10px; align-items: center; font-size: .84rem; }
+.trk { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.fill { display: block; height: 100%; background: var(--cool); border-radius: 999px; }
+.bar-row.best .fill { background: var(--accent); }
+.bar-row .v { font: 500 .74rem var(--mono); text-align: right; }
+.bar-row.best .v, .bar-row.best .l { color: var(--accent); }
+.status { font: 500 .72rem var(--mono); text-transform: uppercase; color: var(--accent); }
+.listgrid { display: grid; gap: 28px; }
+.listgrid h3 { font-family: var(--display); font-weight: 900; font-size: 1.6rem; text-transform: uppercase; margin-bottom: 10px; color: var(--accent); }
+.listgrid .plist { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.noscene { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<canvas id="scene" aria-label="3D lab. Drive the robot with WASD or arrow keys, or tap the floor."></canvas>
+<div class="labels" id="labels" aria-hidden="true"></div>
+
+<div class="hud-tl">
+  <span class="disp">Yousef <span>Robot Lab</span></span>
+  <span class="zone-now" id="zone-now">zone · <b>start pad</b></span>
+</div>
+<div class="hud-tr">
+  <canvas id="minimap" width="300" height="300" aria-hidden="true"></canvas>
+  <button class="tbtn" type="button" id="open-list">All projects ☰</button>
+  <a class="tbtn primary" href="https://drive.google.com/file/d/1aHct2497Do81mfvoXvjnYqR-Wv7NZp4c/view" target="_blank" rel="noopener">CV ↗</a>
+</div>
+<div class="hud-bl" aria-hidden="true">
+  <span class="key k-desk">W</span><span class="key k-desk">A</span><span class="key k-desk">S</span><span class="key k-desk">D</span><span class="mono k-desk">drive</span>
+  <span class="key k-desk">E</span><span class="mono k-desk">open</span>
+  <span class="mono">or tap the floor</span>
+</div>
+
+<div class="prompt" id="prompt" hidden><span id="prompt-t"></span><button class="tbtn primary" type="button" id="prompt-b">Open · E</button></div>
+<aside class="panel" id="panel" aria-live="polite"></aside>
+
+<div class="intro" id="intro">
+  <div class="intro-card">
+    <span class="mono">IoT &amp; AI Developer · Robotics &amp; AI · Cairo</span>
+    <h1 class="disp">Yousef <span>Robot Lab</span></h1>
+    <p>Drive the robot around the lab. Each zone is a field I work in, and every pillar is a project you can open to see how it works.</p>
+    <div class="keys"><span class="key">W A S D</span><span class="key">↑ ← ↓ →</span><span class="key">E open</span><span class="key">tap floor to drive</span></div>
+    <div class="row-btns" style="justify-content:center">
+      <button class="btn primary" type="button" id="start">Start driving →</button>
+      <button class="btn" type="button" id="skip">Just show me the projects</button>
+      <a class="btn" href="https://drive.google.com/file/d/1aHct2497Do81mfvoXvjnYqR-Wv7NZp4c/view" target="_blank" rel="noopener">View my CV ↗</a>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title" hidden>
+  <div class="modal-in">
+    <div class="mbar"><span class="mono" id="m-pos"></span><div class="row-btns"><button class="btn" type="button" id="m-close">Back to the lab ✕</button></div></div>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pad = n => String(n).padStart(2, '0');
+  const $ = s => document.querySelector(s);
+  const css = getComputedStyle(document.documentElement), V = n => css.getPropertyValue(n).trim();
+
+  /* ---------- case study ---------- */
+  function caseHTML(p) {
+    const kpis = p.kpis.map(([v, l]) => `<div class="kpi"><b>${esc(v)}</b><span class="mono">${esc(l)}</span></div>`).join('');
+    const flow = p.flow.map(([h, d]) => `<li><h4>${esc(h)}</h4><p>${esc(d)}</p></li>`).join('');
+    let bars = '';
+    if (p.bars) { const vals = p.bars.items.map(i => i[1]), max = Math.max(...vals), best = p.bars.better === 'low' ? Math.min(...vals) : max;
+      bars = `<div><h3 class="sub">Numbers</h3><div class="bars"><span class="mono">${esc(p.bars.cap)}</span>${p.bars.items.map(([l, v]) => `<div class="bar-row ${v === best ? 'best' : ''}"><span class="l">${esc(l)}</span><span class="trk"><span class="fill" style="width:${(v / max * 100).toFixed(1)}%"></span></span><span class="v">${v}${p.bars.unit ? ' ' + p.bars.unit : ''}</span></div>`).join('')}</div></div>`; }
+    const code = p.repo ? `<a class="btn primary" href="${p.repo}" target="_blank" rel="noopener">View code on GitHub ↗</a>` : p.repoAlt ? `<a class="btn primary" href="${p.repoAlt[1]}" target="_blank" rel="noopener">${esc(p.repoAlt[0])} ↗</a>` : `<span class="btn" aria-disabled="true">${esc(p.repoNote || 'Private repo')}</span>`;
+    const extra = p.extra ? `<a class="btn" href="${p.extra[1]}" target="_blank" rel="noopener">${esc(p.extra[0])} ↗</a>` : '';
+    return `<div class="case" style="display:grid;gap:30px">
+      <div style="display:grid;gap:12px"><span class="mono" style="color:var(--cool)">${esc(p.tag)}</span>${p.status ? `<span class="status">● ${esc(p.status)}</span>` : ''}<h2 class="disp" id="m-title">${esc(p.title)}</h2><p class="summary">${esc(p.summary)}</p><div class="row-btns">${code}${extra}</div></div>
+      <div class="kpis">${kpis}</div>
+      <div class="cols"><div><h3 class="sub">How it works</h3><ol class="flow">${flow}</ol></div>
+        <div style="display:grid;gap:28px">${bars}${p.notes.length ? `<div><h3 class="sub">Decisions</h3><ul class="notes">${p.notes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}<div><h3 class="sub">Stack</h3><ul class="chips">${p.stack.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div></div></div>
+    </div>`;
+  }
+  const modal = $('#modal'), mBody = $('#m-body');
+  let paused = false;
+  function openModal(html, pos) {
+    mBody.innerHTML = html; $('#m-pos').textContent = pos || '';
+    modal.hidden = false; modal.scrollTop = 0; paused = true;
+    if (window.gsap && !reduce) gsap.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: .35 }), gsap.from(mBody.children[0]?.children || [], { y: 24, opacity: 0, duration: .6, ease: 'expo.out', stagger: .05 });
+    $('#m-close').focus({ preventScroll: true });
+  }
+  function closeModal() { modal.hidden = true; paused = false; }
+  const openProject = id => { const i = PROJECTS.findIndex(p => p.id === id); if (i >= 0) openModal(caseHTML(PROJECTS[i]), `project ${pad(i + 1)} / ${pad(PROJECTS.length)}`); };
+  function listHTML() {
+    return `<div class="listgrid"><h2 class="disp" id="m-title" style="font-size:clamp(2.6rem,7vw,4.6rem)">All projects</h2>${CATS.filter(c => c[0] !== 'all').map(([k, l]) => {
+      const ps = PROJECTS.filter(p => p.cat === k); if (!ps.length) return '';
+      return `<div><h3>${esc(l)}</h3><div class="plist">${ps.map(p => `<button class="pitem" type="button" data-proj="${p.id}"><span><small>${esc(p.tag)}</small><b>${esc(p.title)}</b></span><span class="v">${esc(p.big)}</span></button>`).join('')}</div></div>`; }).join('')}</div>`;
+  }
+  $('#m-close').addEventListener('click', closeModal);
+  $('#open-list').addEventListener('click', () => openModal(listHTML(), 'index'));
+  document.addEventListener('click', e => { const b = e.target.closest('[data-proj]'); if (b) openProject(b.dataset.proj); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+
+  /* ---------- zones ---------- */
+  const ZONES = [
+    { id: 'start', name: 'Start pad', x: 0, z: 0, r: 4.2, kind: 'about' },
+    { id: 'cv', name: 'Vision lab', x: -12, z: -9, r: 5.4, cat: 'cv' },
+    { id: 'nlp', name: 'Language & RAG', x: 12, z: -9, r: 6.2, cat: 'nlp' },
+    { id: 'apps', name: 'App studio', x: 0, z: -18, r: 3.8, cat: 'apps' },
+    { id: 'ml', name: 'ML bench', x: -13, z: 8, r: 4.6, cat: 'ml' },
+    { id: 'iot', name: 'Embedded bay', x: 13, z: 8, r: 3.8, cat: 'iot' },
+    { id: 'hq', name: 'HQ', x: 0, z: 16, r: 4.4, kind: 'hq' }
+  ];
+  function zonePanel(z) {
+    if (z.kind === 'about') return `<span class="mono">zone · start pad</span><h2 class="disp">Hi, I'm Yousef</h2><p>Final-year CS (Robotics &amp; AI) at Helwan National University and IoT &amp; AI developer at VoltX. I build computer vision, RAG and embedded systems that run in real time.</p><p>Drive to a zone to see its projects. Head south to <b style="color:var(--fg)">HQ</b> for experience and contact.</p>`;
+    if (z.kind === 'hq') return `<span class="mono">zone · HQ</span><h2 class="disp">Experience</h2><div class="jl">${EXPERIENCE.map(x => `<div><b>${esc(x.role)}</b><span>${esc(x.org)} · ${esc(x.when)}</span></div>`).join('')}</div><h2 class="disp" style="font-size:1.6rem">Contact</h2><p style="color:var(--fg);font-family:var(--mono);user-select:all">${EMAIL}</p><div class="links"><a class="tbtn" href="${LINKS.linkedin}" target="_blank" rel="noopener">LinkedIn ↗</a><a class="tbtn" href="${LINKS.github}" target="_blank" rel="noopener">GitHub ↗</a><a class="tbtn" href="${LINKS.kaggle}" target="_blank" rel="noopener">Kaggle ↗</a><a class="tbtn primary" href="https://drive.google.com/file/d/1aHct2497Do81mfvoXvjnYqR-Wv7NZp4c/view" target="_blank" rel="noopener">CV ↗</a></div>`;
+    const ps = PROJECTS.filter(p => p.cat === z.cat);
+    return `<span class="mono">zone · ${ps.length} projects</span><h2 class="disp">${esc(z.name)}</h2><div class="plist">${ps.map(p => `<button class="pitem" type="button" data-proj="${p.id}"><span><small>${esc(p.tag)}</small><b>${esc(p.title)}</b></span><span class="v">${esc(p.big)}</span></button>`).join('')}</div>`;
+  }
+  const panel = $('#panel');
+  let curZone = null;
+  function setZone(z) {
+    if (z === curZone) return; curZone = z;
+    $('#zone-now').innerHTML = `zone · <b>${esc(z ? z.name.toLowerCase() : 'open floor')}</b>`;
+    if (!z) { panel.hidden = true; return; }
+    panel.innerHTML = zonePanel(z); panel.hidden = false;
+    if (window.gsap && !reduce) gsap.fromTo(panel, { x: 30, opacity: 0 }, { x: 0, opacity: 1, duration: .5, ease: 'expo.out' });
+  }
+
+  /* ---------- intro ---------- */
+  const intro = $('#intro');
+  const begin = () => { if (window.gsap && !reduce) gsap.to(intro, { opacity: 0, duration: .5, onComplete: () => intro.remove() }); else intro.remove(); $('#scene').focus?.(); };
+  $('#start').addEventListener('click', begin);
+  $('#skip').addEventListener('click', () => { begin(); openModal(listHTML(), 'index'); });
+
+  /* ---------- scene ---------- */
+  if (!window.THREE) { document.body.insertAdjacentHTML('beforeend', '<div class="noscene">3D could not load. Use “All projects”.</div>'); setZone(ZONES[0]); return; }
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas: $('#scene'), antialias: true }); } catch { document.body.insertAdjacentHTML('beforeend', '<div class="noscene">Your browser blocked WebGL. Use “All projects”.</div>'); setZone(ZONES[0]); return; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setSize(innerWidth, innerHeight, false);
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const BG = new THREE.Color(V('--bg')), ACC = new THREE.Color(V('--accent')), COOL = new THREE.Color(V('--cool')), FG = new THREE.Color(V('--fg'));
+  renderer.setClearColor(BG);
+  const scene = new THREE.Scene(); scene.fog = new THREE.Fog(BG, 26, 62);
+  const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, .1, 200);
+  scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x0b0d12, .55));
+  const sun = new THREE.DirectionalLight(0xffffff, .85); sun.position.set(14, 26, 10); sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 80 });
+  scene.add(sun, sun.target);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x10131a, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  const grid = new THREE.GridHelper(200, 100, 0x262b36, 0x1a1e27); grid.position.y = .01; scene.add(grid);
+
+  const pillars = [];
+  const labelsEl = $('#labels'), labelItems = [];
+  ZONES.forEach((z, zi) => {
+    const col = zi % 2 ? COOL : ACC;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(z.r - .12, z.r, 72), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .9 }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(z.x, .03, z.z); scene.add(ring);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(z.r, 72), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .05 }));
+    disc.rotation.x = -Math.PI / 2; disc.position.set(z.x, .02, z.z); scene.add(disc);
+    z.ring = ring;
+    const ps = z.cat ? PROJECTS.filter(p => p.cat === z.cat) : [];
+    const lab = document.createElement('div'); lab.className = 'zl';
+    lab.innerHTML = `<div class="n">${esc(z.name)}</div><div class="c">${z.cat ? ps.length + ' projects' : z.kind === 'hq' ? 'experience · contact' : 'about me'}</div>`;
+    labelsEl.appendChild(lab); labelItems.push({ el: lab, pos: new THREE.Vector3(z.x, z.cat ? 4.6 : 2.6, z.z) });
+    if (z.kind === 'hq') { // antenna tower
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(.15, .5, 5, 8), new THREE.MeshStandardMaterial({ color: 0x2a303c, metalness: .4, roughness: .5 }));
+      t.position.set(z.x, 2.5, z.z); t.castShadow = true; scene.add(t);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(.28, 16, 16), new THREE.MeshBasicMaterial({ color: ACC })); b.position.set(z.x, 5.1, z.z); scene.add(b); z.beacon = b;
+    }
+    ps.forEach((p, k) => {
+      const a = (k / ps.length) * Math.PI * 2 + zi, rr = z.r * .58;
+      const h = 1.3 + (k % 3) * .55;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1.1, h, 1.1), new THREE.MeshStandardMaterial({ color: 0x232833, roughness: .6, metalness: .2 }));
+      m.position.set(z.x + Math.cos(a) * rr, h / 2, z.z + Math.sin(a) * rr); m.castShadow = true; m.receiveShadow = true;
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(1.14, .12, 1.14), new THREE.MeshBasicMaterial({ color: col }));
+      cap.position.y = h / 2 + .06; m.add(cap);
+      m.userData = { p, cap, h, baseCol: col.clone() };
+      scene.add(m); pillars.push(m);
+      const pl = document.createElement('div'); pl.className = 'pl'; pl.textContent = p.title;
+      labelsEl.appendChild(pl); labelItems.push({ el: pl, pos: new THREE.Vector3(m.position.x, h + .9, m.position.z), pillar: m });
+      m.userData.label = pl;
+    });
+  });
+
+  /* robot */
+  const robot = new THREE.Group(); scene.add(robot);
+  const shell = new THREE.MeshStandardMaterial({ color: FG, roughness: .45, metalness: .1 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1b1f28, roughness: .8 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, .7, 1.5), shell); body.position.y = .75; body.castShadow = true; robot.add(body);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.32, .12, 1.52), new THREE.MeshBasicMaterial({ color: ACC })); stripe.position.y = .62; robot.add(stripe);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.95, .55, .85), shell); head.position.set(0, 1.4, .1); head.castShadow = true; robot.add(head);
+  const visor = new THREE.Mesh(new THREE.PlaneGeometry(.75, .25), new THREE.MeshBasicMaterial({ color: COOL })); visor.position.set(0, 1.43, .53); robot.add(visor);
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .5, 6), dark); ant.position.set(.3, 1.9, -.1); robot.add(ant);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.09, 12, 12), new THREE.MeshBasicMaterial({ color: ACC })); bulb.position.set(.3, 2.17, -.1); robot.add(bulb);
+  const wheels = [];
+  [[-.72, .6], [.72, .6], [-.72, -.6], [.72, -.6]].forEach(([x, z]) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(.36, .36, .26, 18), dark); w.rotation.z = Math.PI / 2; w.position.set(x, .36, z); w.castShadow = true; robot.add(w); wheels.push(w); });
+  const lidar = new THREE.Mesh(new THREE.RingGeometry(.9, 1, 64), new THREE.MeshBasicMaterial({ color: COOL, transparent: true, opacity: .6, side: THREE.DoubleSide }));
+  lidar.rotation.x = -Math.PI / 2; lidar.position.y = .04; scene.add(lidar);
+  const marker = new THREE.Mesh(new THREE.RingGeometry(.35, .5, 32), new THREE.MeshBasicMaterial({ color: ACC, transparent: true, opacity: .9 }));
+  marker.rotation.x = -Math.PI / 2; marker.position.y = .05; marker.visible = false; scene.add(marker);
+
+  const st = { x: 0, z: 2.2, h: Math.PI, v: 0 }; // heading π = facing -z (north)
+  const keys = new Set(); let target = null;
+  addEventListener('keydown', e => {
+    if (!modal.hidden || e.target.closest('input, textarea')) return;
+    const k = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); target = null; e.preventDefault(); if (document.getElementById('intro')) begin(); }
+    if (k === 'e' && near) openProject(near.userData.p.id);
+  });
+  addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+  addEventListener('blur', () => keys.clear());
+
+  /* picking */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const canvas = $('#scene');
+  let hover = null, downAt = null;
+  function pick(e) { ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera); }
+  canvas.addEventListener('pointermove', e => {
+    pick(e); const hit = ray.intersectObjects(pillars, false)[0];
+    const m = hit ? hit.object : null;
+    if (m !== hover) { hover && hover.userData.label.classList.remove('hot'); hover = m; hover && hover.userData.label.classList.add('hot'); canvas.classList.toggle('hov', !!m); }
+  });
+  canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+  canvas.addEventListener('pointerup', e => {
+    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 8) return;
+    pick(e);
+    const hit = ray.intersectObjects(pillars, false)[0];
+    if (hit) { openProject(hit.object.userData.p.id); return; }
+    const g = ray.intersectObject(ground)[0];
+    if (g) { target = { x: g.point.x, z: g.point.z }; marker.position.x = g.point.x; marker.position.z = g.point.z; marker.visible = true; }
+  });
+  $('#prompt-b').addEventListener('click', () => near && openProject(near.userData.p.id));
+
+  /* minimap */
+  const mm = $('#minimap'), mx = mm.getContext('2d');
+  function drawMap() {
+    const W = mm.width, s = W / 50, c = W / 2;
+    mx.clearRect(0, 0, W, W);
+    ZONES.forEach((z, i) => { mx.beginPath(); mx.arc(c + z.x * s, c + z.z * s, z.r * s, 0, 7); mx.strokeStyle = i % 2 ? V('--cool') : V('--accent'); mx.lineWidth = 3; mx.globalAlpha = z === curZone ? 1 : .45; mx.stroke(); });
+    mx.globalAlpha = 1; mx.fillStyle = V('--muted'); pillars.forEach(p => mx.fillRect(c + p.position.x * s - 3, c + p.position.z * s - 3, 6, 6));
+    mx.save(); mx.translate(c + st.x * s, c + st.z * s); mx.rotate(-st.h); mx.fillStyle = V('--fg');
+    mx.beginPath(); mx.moveTo(0, 14); mx.lineTo(-9, -8); mx.lineTo(9, -8); mx.closePath(); mx.fill(); mx.restore();
+  }
+
+  /* loop */
+  let near = null, last = performance.now();
+  const prompt = $('#prompt'), promptT = $('#prompt-t');
+  const camPos = new THREE.Vector3(0, 14, 14), look = new THREE.Vector3();
+  const v3 = new THREE.Vector3();
+  function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
+    if (!paused) {
+      let thr = 0, turn = 0;
+      if (keys.has('w') || keys.has('arrowup')) thr += 1;
+      if (keys.has('s') || keys.has('arrowdown')) thr -= .6;
+      if (keys.has('a') || keys.has('arrowleft')) turn += 1;
+      if (keys.has('d') || keys.has('arrowright')) turn -= 1;
+      if (target && !keys.size) {
+        const dx = target.x - st.x, dz = target.z - st.z, dist = Math.hypot(dx, dz);
+        const diff = wrap(Math.atan2(dx, dz) - st.h);
+        turn = Math.max(-1, Math.min(1, diff * 3));
+        thr = dist > .5 ? (Math.abs(diff) < 1.1 ? Math.min(1, dist / 2 + .3) : .15) : 0;
+        if (dist <= .5) { target = null; marker.visible = false; }
+      }
+      st.h += turn * dt * 2.8 * (thr < 0 ? -1 : 1);
+      st.v += (thr * 9 - st.v) * Math.min(1, dt * 4);
+      st.x += Math.sin(st.h) * st.v * dt; st.z += Math.cos(st.h) * st.v * dt;
+      st.x = Math.max(-40, Math.min(40, st.x)); st.z = Math.max(-40, Math.min(40, st.z));
+      pillars.forEach(p => { const dx = st.x - p.position.x, dz = st.z - p.position.z, d = Math.hypot(dx, dz); if (d < 1.35 && d > 0) { st.x = p.position.x + dx / d * 1.35; st.z = p.position.z + dz / d * 1.35; st.v *= .5; } });
+      robot.position.set(st.x, Math.abs(st.v) > .5 && !reduce ? Math.abs(Math.sin(t * 18)) * .04 : 0, st.z);
+      robot.rotation.y = st.h; robot.rotation.z = reduce ? 0 : -turn * Math.min(1, Math.abs(st.v) / 9) * .06;
+      wheels.forEach(w => w.rotation.x += st.v * dt * 2.6);
+      head.rotation.y = reduce ? 0 : Math.sin(t * .8) * .25 * (Math.abs(st.v) < .5 ? 1 : 0);
+      bulb.visible = Math.sin(t * 5) > -.3;
+      lidar.position.x = st.x; lidar.position.z = st.z;
+      const lp = reduce ? .5 : (t * .7) % 1; lidar.scale.setScalar(1 + lp * 3.5); lidar.material.opacity = .6 * (1 - lp);
+      marker.rotation.z = t * 2;
+      // zone + nearest pillar
+      const z = ZONES.find(z => Math.hypot(st.x - z.x, st.z - z.z) < z.r + .6) || null;
+      setZone(z);
+      ZONES.forEach(zz => { zz.ring.material.opacity = zz === z ? 1 : .5; if (zz.beacon) zz.beacon.visible = Math.sin(t * 3) > 0; });
+      let best = null, bd = 2.4;
+      pillars.forEach(p => { const d = Math.hypot(st.x - p.position.x, st.z - p.position.z); if (d < bd) { bd = d; best = p; } p.userData.cap.position.y = p.userData.h / 2 + .06 + (reduce ? 0 : Math.sin(t * 2 + p.position.x) * .04); });
+      if (best !== near) { near && near.userData.label.classList.remove('hot'); near = best; near && near.userData.label.classList.add('hot'); prompt.hidden = !near; if (near) promptT.textContent = near.userData.p.title; }
+      // camera follow
+      camPos.set(st.x, innerWidth < 700 ? 17 : 13, st.z + (innerWidth < 700 ? 15 : 12));
+      camera.position.lerp(camPos, Math.min(1, dt * 3)); look.lerp(v3.set(st.x, 0, st.z - 2), Math.min(1, dt * 4)); camera.lookAt(look);
+      sun.position.set(st.x + 14, 26, st.z + 10); sun.target.position.set(st.x, 0, st.z);
+      renderer.render(scene, camera);
+      // labels
+      labelItems.forEach(it => {
+        v3.copy(it.pos).project(camera);
+        const vis = v3.z < 1 && Math.abs(v3.x) < 1.2 && Math.abs(v3.y) < 1.2;
+        const dist = it.pillar ? Math.hypot(st.x - it.pillar.position.x, st.z - it.pillar.position.z) : 0;
+        const show = vis && (!it.pillar || dist < 9 || it.el.classList.contains('hot'));
+        it.el.style.display = show ? '' : 'none';
+        if (show) it.el.style.transform = `translate(${(v3.x * .5 + .5) * innerWidth}px, ${(-v3.y * .5 + .5) * innerHeight}px) translate(-50%, -100%)`;
+      });
+      drawMap();
+    }
+    requestAnimationFrame(frame);
+  }
+  labelItems.forEach(it => { it.el.style.left = '0'; it.el.style.top = '0'; });
+  addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+  camera.position.set(0, 30, 30);
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
