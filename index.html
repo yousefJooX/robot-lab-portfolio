@@ -311,13 +311,25 @@ h1, h2, h3, h4, p { margin: 0; }
       pick = vs.find(v => /natural|neural|online/i.test(v.name)) || vs.find(v => /google (uk|us) english/i.test(v.name)) || vs.find(v => /^en-(us|gb)/i.test(v.lang)) || vs[0] || null;
     };
     if (synth) { choose(); synth.addEventListener?.('voiceschanged', choose); }
-    function say(text, interrupt = true) {
-      if (!on || !synth) return;
-      if (!interrupt && synth.speaking) return;
-      if (interrupt) synth.cancel();
+    const player = new Audio(); player.preload = 'auto';
+    const busy = () => (!player.paused && !player.ended) || (synth && synth.speaking);
+    let pending = null;
+    const stop = () => { pending = null; player.pause(); if (synth) synth.cancel(); };
+    player.addEventListener('ended', () => { if (pending) { const q = pending; pending = null; say(q.key, q.text); } });
+    function speak(text) { // fallback: the device's own voice
+      if (!synth) return;
       const u = new SpeechSynthesisUtterance(text);
       if (pick) u.voice = pick; u.lang = pick ? pick.lang : 'en-US'; u.rate = 1.02; u.pitch = 1.08;
       synth.speak(u);
+    }
+    function say(key, text, interrupt = true) {
+      if (!on) return;
+      if (!interrupt && busy()) { pending = { key, text }; return; }
+      if (interrupt) stop();
+      let fell = false; const fallback = () => { if (!fell) { fell = true; speak(text); } };
+      player.onerror = fallback;
+      player.src = `voice/${key}.mp3`;
+      player.play().catch(fallback);
     }
     const count = c => PROJECTS.filter(p => p.cat === c).length;
     const LINES = {
@@ -331,10 +343,10 @@ h1, h2, h3, h4, p { margin: 0; }
     };
     return {
       get on() { return on; },
-      toggle() { on = !on; try { localStorage.setItem('rl-voice', on ? 'on' : 'off'); } catch {} if (!on && synth) synth.cancel(); else say('Voice on.'); return on; },
-      welcome() { if (welcomed) return; welcomed = true; welcomeAt = performance.now(); say(`Welcome to Joox's portfolio! I'm Yousef's robot. Walk around the lab with the arrow keys or the joystick, and step into any zone to explore his projects.`); },
-      zone(z) { if (!z || !LINES[z.id]) return; const now = performance.now(); if (now - (lastZone[z.id] || -1e9) < 25000) return; lastZone[z.id] = now; say(LINES[z.id](), now - welcomeAt > 9000); },
-      near(p) { if (!p || p === lastNear) return; lastNear = p; say(`${p.title}. ${coarse ? 'Tap open' : 'Press E'} to see how it works.`, false); }
+      toggle() { on = !on; try { localStorage.setItem('rl-voice', on ? 'on' : 'off'); } catch {} if (!on) stop(); else say('voice-on', 'Voice on.'); return on; },
+      welcome() { if (welcomed) return; welcomed = true; welcomeAt = performance.now(); say('welcome', `Welcome to Joox's portfolio! I'm Yousef's robot. Walk around the lab with the arrow keys or the joystick, and step into any zone to explore his projects.`); },
+      zone(z) { if (!z || !LINES[z.id]) return; const now = performance.now(); if (now - (lastZone[z.id] || -1e9) < 25000) return; lastZone[z.id] = now; say('zone-' + z.id, LINES[z.id](), now - welcomeAt > 9000); },
+      near(p) { if (!p || p === lastNear) return; lastNear = p; say('p-' + p.id, `${p.title}. ${coarse ? 'Tap open' : 'Press E'} to see how it works.`, false); }
     };
   })();
   const vbtn = $('#voice-btn');
