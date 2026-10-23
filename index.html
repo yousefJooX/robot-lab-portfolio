@@ -188,6 +188,7 @@ h1, h2, h3, h4, p { margin: 0; }
 <div class="hud-tr">
   <canvas id="minimap" width="300" height="300" aria-hidden="true"></canvas>
   <button class="tbtn" type="button" id="open-list">All projects ☰</button>
+  <button class="tbtn" type="button" id="voice-btn" aria-pressed="true">🔊 Voice</button>
   <a class="tbtn primary" href="https://drive.google.com/file/d/1aHct2497Do81mfvoXvjnYqR-Wv7NZp4c/view" target="_blank" rel="noopener">CV ↗</a>
 </div>
 <div class="hud-bl" aria-hidden="true">
@@ -198,6 +199,7 @@ h1, h2, h3, h4, p { margin: 0; }
   <span class="key k-desk">1–7</span><span class="mono k-desk">zones</span>
   <span class="key k-desk">E</span><span class="mono k-desk">open</span>
   <span class="key k-desk">Scroll</span><span class="mono k-desk">zoom</span>
+  <span class="key k-desk">M</span><span class="mono k-desk">voice</span>
   <span class="mono k-touch">tap the floor to walk</span>
 </div>
 <div class="joy" id="joy" aria-label="Move the robot"><div class="knob"></div></div>
@@ -299,9 +301,52 @@ h1, h2, h3, h4, p { margin: 0; }
   const panel = $('#panel');
   const coarse = matchMedia('(hover: none), (pointer: coarse)').matches;
   panel.addEventListener('click', e => { if (!e.target.closest('.ph')) return; const c = panel.classList.toggle('collapsed'); e.target.closest('.ph').setAttribute('aria-expanded', String(!c)); });
+  /* ---------- voice guide (browser speech, no audio files) ---------- */
+  const voice = (() => {
+    const synth = window.speechSynthesis;
+    let on = true, pick = null, lastZone = {}, lastNear = null, welcomed = false, welcomeAt = -1e9;
+    try { on = localStorage.getItem('rl-voice') !== 'off'; } catch {}
+    const choose = () => {
+      const vs = synth ? synth.getVoices().filter(v => /^en(-|_|$)/i.test(v.lang)) : [];
+      pick = vs.find(v => /natural|neural|online/i.test(v.name)) || vs.find(v => /google (uk|us) english/i.test(v.name)) || vs.find(v => /^en-(us|gb)/i.test(v.lang)) || vs[0] || null;
+    };
+    if (synth) { choose(); synth.addEventListener?.('voiceschanged', choose); }
+    function say(text, interrupt = true) {
+      if (!on || !synth) return;
+      if (!interrupt && synth.speaking) return;
+      if (interrupt) synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      if (pick) u.voice = pick; u.lang = pick ? pick.lang : 'en-US'; u.rate = 1.02; u.pitch = 1.08;
+      synth.speak(u);
+    }
+    const count = c => PROJECTS.filter(p => p.cat === c).length;
+    const LINES = {
+      start: () => `This is the start pad. Here you can read who Yousef is.`,
+      cv: () => `Welcome to the vision lab. ${count('cv')} computer vision projects: real-time hand and face tracking, and a YOLO safety detector.`,
+      nlp: () => `This is the language and RAG zone. ${count('nlp')} projects about large language models, retrieval, image captioning and translation.`,
+      apps: () => `Welcome to the app studio. This is StudyHub, a study workspace that Yousef's classmates use every day.`,
+      ml: () => `This is the machine learning bench. Classical models, honest benchmarks and clean pipelines.`,
+      iot: () => `You're in the embedded bay. Here Yousef runs real-time tasks and models on ESP32 microcontrollers.`,
+      hq: () => `Welcome to HQ. Here you'll find Yousef's experience, his CV, and how to contact him.`
+    };
+    return {
+      get on() { return on; },
+      toggle() { on = !on; try { localStorage.setItem('rl-voice', on ? 'on' : 'off'); } catch {} if (!on && synth) synth.cancel(); else say('Voice on.'); return on; },
+      welcome() { if (welcomed) return; welcomed = true; welcomeAt = performance.now(); say(`Welcome to Joox's portfolio! I'm Yousef's robot. Walk around the lab with the arrow keys or the joystick, and step into any zone to explore his projects.`); },
+      zone(z) { if (!z || !LINES[z.id]) return; const now = performance.now(); if (now - (lastZone[z.id] || -1e9) < 25000) return; lastZone[z.id] = now; say(LINES[z.id](), now - welcomeAt > 9000); },
+      near(p) { if (!p || p === lastNear) return; lastNear = p; say(`${p.title}. ${coarse ? 'Tap open' : 'Press E'} to see how it works.`, false); }
+    };
+  })();
+  const vbtn = $('#voice-btn');
+  const paintV = () => { vbtn.textContent = voice.on ? '🔊 Voice' : '🔇 Muted'; vbtn.setAttribute('aria-pressed', String(voice.on)); };
+  paintV();
+  vbtn.addEventListener('click', () => { voice.toggle(); paintV(); });
+  addEventListener('keydown', e => { if (e.key && e.key.toLowerCase() === 'm' && modal.hidden && !e.target.closest?.('input, textarea')) { voice.toggle(); paintV(); } });
+
   let curZone = null;
   function setZone(z) {
     if (z === curZone) return; curZone = z;
+    if (!document.getElementById('intro')) voice.zone(z);
     $('#zone-now').innerHTML = `zone · <b>${esc(z ? z.name.toLowerCase() : 'open floor')}</b>`;
     if (!z) { panel.hidden = true; return; }
     const html = zonePanel(z), cut = html.indexOf('</h2>') + 5;
@@ -312,7 +357,7 @@ h1, h2, h3, h4, p { margin: 0; }
 
   /* ---------- intro ---------- */
   const intro = $('#intro');
-  const begin = () => { if (window.gsap && !reduce) gsap.to(intro, { opacity: 0, duration: .5, onComplete: () => intro.remove() }); else intro.remove(); $('#scene').focus?.(); };
+  const begin = () => { voice.welcome(); if (window.gsap && !reduce) gsap.to(intro, { opacity: 0, duration: .5, onComplete: () => intro.remove() }); else intro.remove(); $('#scene').focus?.(); };
   $('#start').addEventListener('click', begin);
   $('#skip').addEventListener('click', () => { begin(); openModal(listHTML(), 'index'); });
 
@@ -562,6 +607,7 @@ h1, h2, h3, h4, p { margin: 0; }
       let best = null, bd = 2.4;
       pillars.forEach(p => { const d = Math.hypot(st.x - p.position.x, st.z - p.position.z); if (d < bd) { bd = d; best = p; } p.userData.cap.position.y = p.userData.h / 2 + .06 + (reduce ? 0 : Math.sin(t * 2 + p.position.x) * .04); });
       if (best !== near) { near && near.userData.label.classList.remove('hot'); near = best; near && near.userData.label.classList.add('hot'); prompt.hidden = !near; if (near) promptT.textContent = near.userData.p.title; }
+      if (near && st.v < 2 && !st.air) voice.near(near.userData.p);
       // camera follow
       camPos.set(st.x, (innerWidth < 700 ? 17 : 13) * zoom, st.z + (innerWidth < 700 ? 15 : 12) * zoom);
       camera.position.lerp(camPos, Math.min(1, dt * 3)); look.lerp(v3.set(st.x, st.y * .4, st.z - 2), Math.min(1, dt * 4)); camera.lookAt(look);
