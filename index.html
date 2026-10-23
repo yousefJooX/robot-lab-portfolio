@@ -197,6 +197,7 @@ h1, h2, h3, h4, p { margin: 0; }
   <span class="key k-desk">Tab</span><span class="mono k-desk">run to next project</span>
   <span class="key k-desk">1–7</span><span class="mono k-desk">zones</span>
   <span class="key k-desk">E</span><span class="mono k-desk">open</span>
+  <span class="key k-desk">Scroll</span><span class="mono k-desk">zoom</span>
   <span class="mono k-touch">tap the floor to walk</span>
 </div>
 <div class="joy" id="joy" aria-label="Move the robot"><div class="knob"></div></div>
@@ -402,7 +403,7 @@ h1, h2, h3, h4, p { margin: 0; }
   let dustI = 0;
   function puff(x, z, n = 1, spread = .6) { for (let i = 0; i < n; i++) { const d = dust[dustI++ % dust.length]; d.m.position.set(x + (Math.random() - .5) * spread, .1, z + (Math.random() - .5) * spread); d.vx = (Math.random() - .5) * 1.5; d.vz = (Math.random() - .5) * 1.5; d.vy = .6 + Math.random(); d.life = 1; d.m.visible = true; } }
 
-  const st = { x: 0, z: 2.2, h: Math.PI, v: 0, y: 0, vy: 0, air: false, flip: 0, flipDir: -1, phase: 0, land: 0 }; // heading π = facing -z (north)
+  const st = { x: 0, z: 2.2, h: Math.PI, v: 0, vx: 0, vz: 0, face: null, y: 0, vy: 0, air: false, flip: 0, flipDir: -1, phase: 0, land: 0 }; // heading π = facing -z (north)
   const GRAV = 26;
   const keys = new Set(); let target = null, auto = false, sprintLatch = false, nextIdx = -1;
   function jump() {
@@ -421,7 +422,7 @@ h1, h2, h3, h4, p { margin: 0; }
   }
   function goZone(i) { const z = ZONES[i]; if (z) { goTo(z.x, z.z + (z.cat ? 0 : 1.5)); toastHUD(`→ ${z.name}`); } }
   addEventListener('keydown', e => {
-    if (!modal.hidden || e.target.closest('input, textarea')) return;
+    if (!modal.hidden || e.target.closest?.('input, textarea')) return;
     const k = e.key.toLowerCase();
     if (document.getElementById('intro') && (k.length === 1 || k.startsWith('arrow') || k === 'tab')) begin();
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); target = null; marker.visible = false; e.preventDefault(); }
@@ -489,33 +490,38 @@ h1, h2, h3, h4, p { margin: 0; }
   let near = null, last = performance.now();
   const prompt = $('#prompt'), promptT = $('#prompt-t');
   const camPos = new THREE.Vector3(0, 14, 14), look = new THREE.Vector3();
+  let zoom = 1;
+  canvas.addEventListener('wheel', e => { e.preventDefault(); zoom = Math.max(.55, Math.min(1.8, zoom * (1 + e.deltaY * .0012))); }, { passive: false });
   const v3 = new THREE.Vector3();
   function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
   function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
     if (!paused) {
-      let thr = 0, turn = 0;
-      if (keys.has('w') || keys.has('arrowup')) thr += 1;
-      if (keys.has('s') || keys.has('arrowdown')) thr -= .6;
-      if (keys.has('a') || keys.has('arrowleft')) turn += 1;
-      if (keys.has('d') || keys.has('arrowright')) turn -= 1;
-      if (joy.id !== null && joy.m > .15) {
-        const diff = wrap(Math.atan2(joy.x, joy.y) - st.h);
-        turn = Math.max(-1, Math.min(1, diff * 4)); thr = joy.m * (Math.abs(diff) < 1.4 ? 1 : .25);
-      } else if (target && !(keys.size - (keys.has('shift') ? 1 : 0))) {
+      // direct, screen-relative movement (camera looks north, so "up" on screen is -z)
+      let ix = 0, iz = 0, want = 0;
+      if (keys.has('w') || keys.has('arrowup')) iz -= 1;
+      if (keys.has('s') || keys.has('arrowdown')) iz += 1;
+      if (keys.has('a') || keys.has('arrowleft')) ix -= 1;
+      if (keys.has('d') || keys.has('arrowright')) ix += 1;
+      if (ix || iz) { const m = Math.hypot(ix, iz); ix /= m; iz /= m; want = 1; }
+      else if (joy.id !== null && joy.m > .12) { const m = Math.hypot(joy.x, joy.y) || 1; ix = joy.x / m; iz = joy.y / m; want = Math.min(1, (joy.m - .12) / .75); }
+      else if (target) {
         const dx = target.x - st.x, dz = target.z - st.z, dist = Math.hypot(dx, dz);
-        const diff = wrap(Math.atan2(dx, dz) - st.h);
-        turn = Math.max(-1, Math.min(1, diff * 3.5));
-        thr = dist > .5 ? (Math.abs(diff) < 1.1 ? Math.min(1, dist / 2 + .3) : .15) : 0;
-        if (dist <= .5) { target = null; marker.visible = false; auto = false; if (near) { const dxp = near.position.x - st.x, dzp = near.position.z - st.z; st.h = Math.atan2(dxp, dzp); } }
+        if (dist > .4) { ix = dx / dist; iz = dz / dist; want = Math.min(1, dist / 1.5 + .2); }
+        else { target = null; marker.visible = false; auto = false; if (near) st.face = Math.atan2(near.position.x - st.x, near.position.z - st.z); }
       }
       const sprint = keys.has('shift') || sprintLatch || auto || (joy.id !== null && joy.m > .92);
-      const top = sprint ? 17 : 8.5;
-      st.h += turn * dt * (sprint ? 3.4 : 2.8) * (thr < 0 ? -1 : 1);
-      st.v += (thr * top - st.v) * Math.min(1, dt * (sprint ? 3 : 4));
-      st.x += Math.sin(st.h) * st.v * dt; st.z += Math.cos(st.h) * st.v * dt;
+      const top = sprint ? 16 : 8;
+      const acc = Math.min(1, dt * (st.air ? 2.5 : want ? 9 : 12));
+      st.vx += (ix * want * top - st.vx) * acc; st.vz += (iz * want * top - st.vz) * acc;
+      st.x += st.vx * dt; st.z += st.vz * dt;
+      st.v = Math.hypot(st.vx, st.vz);
+      const faceTo = st.v > .4 ? Math.atan2(st.vx, st.vz) : (st.face ?? st.h);
+      if (st.v > .4) st.face = null;
+      const dh = wrap(faceTo - st.h); st.h = wrap(st.h + dh * Math.min(1, dt * 14));
+      const turn = Math.max(-1, Math.min(1, dh * 2));
       st.x = Math.max(-40, Math.min(40, st.x)); st.z = Math.max(-40, Math.min(40, st.z));
-      if (!st.air) pillars.forEach(p => { const dx = st.x - p.position.x, dz = st.z - p.position.z, d = Math.hypot(dx, dz); if (d < 1.35 && d > 0) { st.x = p.position.x + dx / d * 1.35; st.z = p.position.z + dz / d * 1.35; st.v *= .5; } });
+      if (!st.air) pillars.forEach(p => { const dx = st.x - p.position.x, dz = st.z - p.position.z, d = Math.hypot(dx, dz); if (d < 1.35 && d > 0) { st.x = p.position.x + dx / d * 1.35; st.z = p.position.z + dz / d * 1.35; st.vx *= .5; st.vz *= .5; } });
       // jump + flip
       if (st.air) {
         st.vy -= GRAV * dt; st.y += st.vy * dt;
@@ -557,7 +563,7 @@ h1, h2, h3, h4, p { margin: 0; }
       pillars.forEach(p => { const d = Math.hypot(st.x - p.position.x, st.z - p.position.z); if (d < bd) { bd = d; best = p; } p.userData.cap.position.y = p.userData.h / 2 + .06 + (reduce ? 0 : Math.sin(t * 2 + p.position.x) * .04); });
       if (best !== near) { near && near.userData.label.classList.remove('hot'); near = best; near && near.userData.label.classList.add('hot'); prompt.hidden = !near; if (near) promptT.textContent = near.userData.p.title; }
       // camera follow
-      camPos.set(st.x, innerWidth < 700 ? 17 : 13, st.z + (innerWidth < 700 ? 15 : 12));
+      camPos.set(st.x, (innerWidth < 700 ? 17 : 13) * zoom, st.z + (innerWidth < 700 ? 15 : 12) * zoom);
       camera.position.lerp(camPos, Math.min(1, dt * 3)); look.lerp(v3.set(st.x, st.y * .4, st.z - 2), Math.min(1, dt * 4)); camera.lookAt(look);
       sun.position.set(st.x + 14, 26, st.z + 10); sun.target.position.set(st.x, 0, st.z);
       renderer.render(scene, camera);
