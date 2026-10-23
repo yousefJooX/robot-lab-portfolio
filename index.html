@@ -377,16 +377,16 @@ h1, h2, h3, h4, p { margin: 0; }
   if (!window.THREE) { document.body.insertAdjacentHTML('beforeend', '<div class="noscene">3D could not load. Use “All projects”.</div>'); setZone(ZONES[0]); return; }
   let renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas: $('#scene'), antialias: true }); } catch { document.body.insertAdjacentHTML('beforeend', '<div class="noscene">Your browser blocked WebGL. Use “All projects”.</div>'); setZone(ZONES[0]); return; }
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  let pr = Math.min(devicePixelRatio || 1, 1.5); renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight, false);
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   const BG = new THREE.Color(V('--bg')), ACC = new THREE.Color(V('--accent')), COOL = new THREE.Color(V('--cool')), FG = new THREE.Color(V('--fg'));
   renderer.setClearColor(BG);
   const scene = new THREE.Scene(); scene.fog = new THREE.Fog(BG, 26, 62);
   const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, .1, 200);
   scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x0b0d12, .55));
   const sun = new THREE.DirectionalLight(0xffffff, .85); sun.position.set(14, 26, 10); sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 80 });
+  sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 70 }); sun.shadow.bias = -.0006;
   scene.add(sun, sun.target);
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x10131a, roughness: 1 }));
@@ -551,6 +551,8 @@ h1, h2, h3, h4, p { margin: 0; }
   canvas.addEventListener('wheel', e => { e.preventDefault(); zoom = Math.max(.55, Math.min(1.8, zoom * (1 + e.deltaY * .0012))); }, { passive: false });
   const v3 = new THREE.Vector3();
   function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+  let frameN = 0, fpsAvg = 16, prevNow = performance.now(), qualityAt = performance.now() + 3000;
+  const fpsEl = /[?&]fps\b/.test(location.search) ? document.body.appendChild(Object.assign(document.createElement('div'), { className: 'mono', style: 'position:fixed;z-index:9;left:50%;top:8px;transform:translateX(-50%);color:var(--fg)' })) : null;
   function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
     if (!paused) {
@@ -569,13 +571,13 @@ h1, h2, h3, h4, p { margin: 0; }
       }
       const sprint = keys.has('shift') || sprintLatch || auto || (joy.id !== null && joy.m > .92);
       const top = sprint ? 16 : 8;
-      const acc = Math.min(1, dt * (st.air ? 2.5 : want ? 9 : 12));
+      const acc = 1 - Math.exp(-dt * (st.air ? 2.5 : want ? 10 : 13));
       st.vx += (ix * want * top - st.vx) * acc; st.vz += (iz * want * top - st.vz) * acc;
       st.x += st.vx * dt; st.z += st.vz * dt;
       st.v = Math.hypot(st.vx, st.vz);
       const faceTo = st.v > .4 ? Math.atan2(st.vx, st.vz) : (st.face ?? st.h);
       if (st.v > .4) st.face = null;
-      const dh = wrap(faceTo - st.h); st.h = wrap(st.h + dh * Math.min(1, dt * 14));
+      const dh = wrap(faceTo - st.h); st.h = wrap(st.h + dh * (1 - Math.exp(-dt * 16)));
       const turn = Math.max(-1, Math.min(1, dh * 2));
       st.x = Math.max(-40, Math.min(40, st.x)); st.z = Math.max(-40, Math.min(40, st.z));
       if (!st.air) pillars.forEach(p => { const dx = st.x - p.position.x, dz = st.z - p.position.z, d = Math.hypot(dx, dz); if (d < 1.35 && d > 0) { st.x = p.position.x + dx / d * 1.35; st.z = p.position.z + dz / d * 1.35; st.vx *= .5; st.vz *= .5; } });
@@ -621,9 +623,12 @@ h1, h2, h3, h4, p { margin: 0; }
       if (best !== near) { near && near.userData.label.classList.remove('hot'); near = best; near && near.userData.label.classList.add('hot'); prompt.hidden = !near; if (near) promptT.textContent = near.userData.p.title; }
       if (near && st.v < 2 && !st.air) voice.near(near.userData.p);
       // camera follow
-      camPos.set(st.x, (innerWidth < 700 ? 17 : 13) * zoom, st.z + (innerWidth < 700 ? 15 : 12) * zoom);
-      camera.position.lerp(camPos, Math.min(1, dt * 3)); look.lerp(v3.set(st.x, st.y * .4, st.z - 2), Math.min(1, dt * 4)); camera.lookAt(look);
-      sun.position.set(st.x + 14, 26, st.z + 10); sun.target.position.set(st.x, 0, st.z);
+      const camH = (innerWidth < 700 ? 17 : 13) * zoom, camB = (innerWidth < 700 ? 15 : 12) * zoom;
+      camPos.set(st.x, camH + st.y * .35, st.z + camB);
+      camera.position.lerp(camPos, 1 - Math.exp(-dt * 7));
+      camera.lookAt(camera.position.x, camera.position.y - camH, camera.position.z - camB - 2);
+      const sx = Math.round(st.x / 4) * 4, sz = Math.round(st.z / 4) * 4;
+      if (sx !== sun.userData.sx || sz !== sun.userData.sz) { sun.userData.sx = sx; sun.userData.sz = sz; sun.position.set(sx + 14, 26, sz + 10); sun.target.position.set(sx, 0, sz); }
       renderer.render(scene, camera);
       // labels
       labelItems.forEach(it => {
@@ -631,14 +636,25 @@ h1, h2, h3, h4, p { margin: 0; }
         const vis = v3.z < 1 && Math.abs(v3.x) < 1.2 && Math.abs(v3.y) < 1.2;
         const dist = it.pillar ? Math.hypot(st.x - it.pillar.position.x, st.z - it.pillar.position.z) : 0;
         const show = vis && (!it.pillar || dist < 9 || it.el.classList.contains('hot'));
-        it.el.style.display = show ? '' : 'none';
-        if (show) it.el.style.transform = `translate(${(v3.x * .5 + .5) * innerWidth}px, ${(-v3.y * .5 + .5) * innerHeight}px) translate(-50%, -100%)`;
+        if (show !== it.shown) { it.shown = show; it.el.style.visibility = show ? 'visible' : 'hidden'; }
+        if (show) {
+          const x = Math.round((v3.x * .5 + .5) * innerWidth), y = Math.round((-v3.y * .5 + .5) * innerHeight);
+          if (x !== it.x || y !== it.y) { it.x = x; it.y = y; it.el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -100%)`; }
+        }
       });
-      drawMap();
+      if ((frameN++ & 1) === 0) drawMap();
+      // adaptive quality: if frames are slow for ~2 s, drop resolution, then shadows
+      fpsAvg += ((now - prevNow) - fpsAvg) * .05; prevNow = now;
+      if (now - qualityAt > 2000 && fpsAvg > 24) {
+        qualityAt = now;
+        if (pr > 1) { pr = 1; renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight, false); }
+        else if (sun.castShadow) { sun.castShadow = false; }
+      }
+      if (fpsEl) fpsEl.textContent = Math.round(1000 / fpsAvg) + ' fps · pr ' + pr + (sun.castShadow ? ' · shadows' : '');
     }
     requestAnimationFrame(frame);
   }
-  labelItems.forEach(it => { it.el.style.left = '0'; it.el.style.top = '0'; });
+  labelItems.forEach(it => { it.el.style.left = '0'; it.el.style.top = '0'; it.el.style.willChange = 'transform'; });
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
   camera.position.set(0, 30, 30);
   requestAnimationFrame(frame);
