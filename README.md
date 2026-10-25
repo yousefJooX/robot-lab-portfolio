@@ -47,6 +47,10 @@ sudo systemctl enable --now portfolio.service portfolio-tunnel.service
 
 [Three.js](https://threejs.org) (r128) · [GSAP](https://gsap.com) + ScrollTrigger · [Lenis](https://lenis.darkroom.engineering) · Google Fonts, all loaded from CDNs.
 
+The line figures on each project page are [hairline](https://github.com/lucasmarkes/hairline) by Lucas Markes (MIT), vendored in [`vendor/`](vendor).
+
+Voice lines in [`voice/`](voice) were generated with a neural text-to-speech voice; the page falls back to the browser's own speech if a file is missing.
+
 The four styles are original code, inspired by well-known open-source portfolios: Bruno Simon's drivable folio, Renovamen's playground-macos, Brittany Chiang's v4 and Albino Tonnina's illustrated desk.
 
 ## License
